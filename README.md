@@ -95,7 +95,7 @@ Evaluate and compare the models on:
 
 The ultimate goal is to draw insights from the comparison of algorithms and portfolio optimization methods across two groups of companies, delivering an empirical foundation for model selection in financial applications.
 
-```
+---
 
 ## 🚀 How to Run
 
