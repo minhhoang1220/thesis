@@ -92,7 +92,7 @@ Evaluate and compare the models on:
 
 The ultimate goal is to draw insights from the comparison of algorithms and portfolio optimization methods across two groups of companies, delivering an empirical foundation for model selection in financial applications.
 
----
+```
 
 ## 🚀 How to Run
 
@@ -103,8 +103,8 @@ Create a virtual environment and install all required packages:
 ```bash
 python -m venv .venv
 source .venv/bin/activate # or .venv\Scripts\activate on Windows
-
 pip install -r requirements.txt
+```
 
 ### 2. Mount Data Folder (if using VM)
 
@@ -112,6 +112,7 @@ Ensure you have mounted the shared data folder from Windows to Ubuntu at:
 
 ```bash
 /mnt/shared-data/Khoa_Luan/
+```
 
 Data files should be organized as:
 
@@ -123,11 +124,13 @@ Data files should be organized as:
 ├── Data_VN/
     └── price/yahoo_price_data_fixed.csv
     └── financial/financial_data_vn.csv
+```
 
 ### 3. Run the pipeline
 
 ```bash
 python run.py
+```
 
 ## 🔬 Example Output (Partial)
 ✅ PRICE DATA
