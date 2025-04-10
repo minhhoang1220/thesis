@@ -1,0 +1,18 @@
+# Virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# VSCode
+.vscode/
+
+# Data files
+*.csv
+*.xlsx
+*.pkl
+*.parquet
+/data/
+mnt/
+
+# System
+.DS_Store
