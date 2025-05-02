@@ -7,7 +7,6 @@ def load_financial_data(nrows=None) -> pd.DataFrame:
     file_global = base_path / "Data_Global" / "financial" / "financial_data.csv"
 
     df_global = pd.read_csv(file_global, nrows=nrows)
-    df_global["Market"] = "Global"
 
     df = pd.concat([df_global], ignore_index=True)
     return df

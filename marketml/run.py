@@ -1,23 +1,26 @@
 from marketml.data.loader import load_price_data, load_financial_data
-from marketml.plot.visualizer import plot_all_closing_prices, plot_normalized_prices_by_group
-
+from marketml.data.loader.preprocess import standardize_data  # Import hàm chuẩn hóa
+# from marketml.plot.visualizer import plot_all_closing_prices
 
 def main():
+    # Load and standardize price data
     print("✅ PRICE DATA")
     df_price = load_price_data(nrows=5)
-    print(df_price)
+    df_price_standardized = standardize_data(df_price)  # Chuẩn hóa dữ liệu giá
+    print(df_price_standardized)
 
+    # Load and standardize financial data
     print("\n✅ FINANCIAL DATA")
     df_fin = load_financial_data(nrows=5)
-    print(df_fin)
+    df_fin_standardized = standardize_data(df_fin)  # Chuẩn hóa dữ liệu tài chính
+    print(df_fin_standardized)
 
-    # Full data for plotting
-    df_price_full = load_price_data()
+    # # Full data for plotting
+    # df_price_full = load_price_data()  # Load full price data for plotting
+    # df_price_full_standardized = standardize_data(df_price_full)  # Chuẩn hóa dữ liệu giá đầy đủ
 
-    # Plot and save figures
-    plot_all_closing_prices(df_price_full)
-    plot_normalized_prices_by_group(df_price_full, group="Global")
-
+    # # Plot and save figures
+    # plot_all_closing_prices(df_price_full_standardized)
 
 if __name__ == "__main__":
     main()

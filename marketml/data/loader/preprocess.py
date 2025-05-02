@@ -1,21 +1,27 @@
-#Xử lý missing data (NaN), tính các chỉ số,...
 import pandas as pd
 
-def standardize_financial_data(df: pd.DataFrame) -> pd.DataFrame:
-    # Chuẩn hóa tên cột: snake_case
+def standardize_data(df: pd.DataFrame, remove_columns: list[str] = None) -> pd.DataFrame:
+    df = df.copy()
     df.columns = (
         df.columns
         .str.strip()
         .str.lower()
         .str.replace(' ', '_')
-        .str.replace('(', '')
-        .str.replace(')', '')
-        .str.replace('%', 'percent')
-        .str.replace('/', '_')
+        .str.replace('-', '_', regex=False)
+        .str.replace('(', '', regex=False)
+        .str.replace(')', '', regex=False)
+        .str.replace('%', 'percent', regex=False)
+        .str.replace('/', '_', regex=False)
     )
 
-    # Chuẩn hóa tất cả các cột dạng numeric
+    if remove_columns:
+        for col in remove_columns:
+            if col in df.columns:
+                df.drop(columns=[col], inplace=True)
+
+    exclude_cols = {"symbol", "year", "ticker","date"}
     for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    
+        if col not in exclude_cols:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
     return df

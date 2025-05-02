@@ -2,6 +2,7 @@ README.md
 setup.py
 marketml/__init__.py
 marketml/__version__.py
+marketml/run.py
 marketml.egg-info/PKG-INFO
 marketml.egg-info/SOURCES.txt
 marketml.egg-info/dependency_links.txt
@@ -12,7 +13,6 @@ marketml/configs/configs.py
 marketml/data/__init__.py
 marketml/data/loader/__init__.py
 marketml/data/loader/finance_loader.py
-marketml/data/loader/manual_financial_vn.py
 marketml/data/loader/preprocess.py
 marketml/data/loader/price_loader.py
 marketml/log/__init__.py
@@ -20,7 +20,9 @@ marketml/log/logging.py
 marketml/model/__init__.py
 marketml/model/portfolio_rl.py
 marketml/model/trend_predictor.py
+marketml/plot/__init__.py
+marketml/plot/visualizer.py
 marketml/utils/__init__.py
 marketml/utils/helpers.py
 marketml/utils/metrics.py
-tests/test_loader.py
+tests/test_preprocessing.py

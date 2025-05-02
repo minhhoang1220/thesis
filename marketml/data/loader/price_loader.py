@@ -8,7 +8,5 @@ def load_price_data(nrows=None) -> pd.DataFrame:
 
     df_global = pd.read_csv(file_global, parse_dates=["Date"], nrows=nrows)
 
-    df_global["Market"] = "Global"
-
     df = pd.concat([df_global], ignore_index=True)
     return df
