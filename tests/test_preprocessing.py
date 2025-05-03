@@ -21,8 +21,8 @@ def test_standardize_financial_data():
             assert False, f"Column {col} cannot be converted to numeric"
 
     # Cột tickers tồn tại, là dạng object
-    assert "tickers" in df_standardized.columns, "'tickers' column is missing"
-    assert df_standardized["tickers"].dtype == object, "'tickers' column should be string"
+    assert "ticker" in df_standardized.columns, "'ticker' column is missing"
+    assert df_standardized["ticker"].dtype == object, "'ticker' column should be string"
 
     # share_outstanding bị loại bỏ
     assert "share_outstanding" not in df_standardized.columns, "'share_outstanding' should be removed"
@@ -31,6 +31,11 @@ def test_standardize_financial_data():
     # In kết quả ra bảng cho kiểm tra thủ công
     print("\n--- Financial Data (After Standardization) ---")
     print(df_standardized.head(10))
+
+    print("\n--- Data Types After Standardization ---")
+    print(df.dtypes)
+    print(df.describe(include='all'))
+    
 
 def test_standardize_price_data():
     df = load_price_data()
@@ -56,6 +61,11 @@ def test_standardize_price_data():
     # In kết quả cho kiểm tra thủ công
     print("\n--- Price Data (After Standardization) ---")
     print(df_standardized.head(10))
+
+    print("\n--- Data Types After Standardization ---")
+    print(df.dtypes)
+    print(df.describe(include='all'))
+    
 
 if __name__ == "__main__":
     test_standardize_financial_data()
