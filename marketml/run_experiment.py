@@ -4,14 +4,14 @@ from datetime import timedelta
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
+from sklearn.utils import class_weight 
 import warnings
 
 # ===== BỎ QUA WARNINGS =====
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-# Bỏ comment dòng dưới nếu muốn tắt cả ValueWarning của statsmodels
-# from statsmodels.tools.sm_exceptions import ValueWarning
-# warnings.filterwarnings("ignore", category=ValueWarning, module='statsmodels.tsa.base.tsa_model')
+from statsmodels.tools.sm_exceptions import ValueWarning
+warnings.filterwarnings("ignore", category=ValueWarning, module='statsmodels.tsa.base.tsa_model')
 # ============================
 
 # Import các thư viện cho ARIMA
@@ -27,6 +27,26 @@ except ModuleNotFoundError:
     exit()
 # ====================================
 
+# === Import TensorFlow/Keras ===
+try:
+    import tensorflow as tf
+    from tensorflow import keras
+    from keras.models import Sequential
+    from keras.layers import LSTM, Dense, Dropout, Input, LayerNormalization, MultiHeadAttention, GlobalAveragePooling1D, Add, Flatten
+    from keras.utils import to_categorical # Có thể cần nếu dùng categorical_crossentropy
+    # Giới hạn sử dụng GPU memory nếu cần thiết (tùy chọn)
+    # gpus = tf.config.experimental.list_physical_devices('GPU')
+    # if gpus:
+    #     try:
+    #         for gpu in gpus:
+    #             tf.config.experimental.set_memory_growth(gpu, True)
+    #     except RuntimeError as e:
+    #         print(e)
+    TF_INSTALLED = True
+except ImportError:
+    print("Warning: TensorFlow is not installed. LSTM and Transformer models will be skipped.")
+    TF_INSTALLED = False
+# ==============================
 
 # ==============================================================================
 # HÀM TẠO CỬA SỔ ROLLING/EXPANDING (Giữ nguyên)
@@ -55,6 +75,42 @@ def create_time_series_cv_splits(
         if not expanding: current_train_start_date += step_period
         current_train_end_date += step_period
     print(f"Total splits generated: {split_index}")
+
+# ==============================================================================
+# HÀM TẠO CHUỖI CHO LSTM/TRANSFORMER
+# ==============================================================================
+def create_sequences(X_data, y_data, time_steps=1):
+    """
+    Chuyển đổi dữ liệu 2D thành chuỗi 3D cho mô hình sequence.
+    """
+    Xs, ys = [], []
+    for i in range(len(X_data) - time_steps):
+        v = X_data[i:(i + time_steps)] # Lấy chuỗi features
+        Xs.append(v)
+        ys.append(y_data[i + time_steps]) # Lấy target tương ứng sau chuỗi
+    return np.array(Xs), np.array(ys)
+
+# ==============================================================================
+
+# ==============================================================================
+# HÀM XÂY DỰNG TRANSFORMER ENCODER ĐƠN GIẢN
+# ==============================================================================
+def transformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
+    # Attention and Normalization
+    x = LayerNormalization(epsilon=1e-6)(inputs)
+    x = MultiHeadAttention(key_dim=head_size, num_heads=num_heads, dropout=dropout)(x, x)
+    x = Dropout(dropout)(x)
+    res = Add()([x, inputs]) # Skip connection
+
+    # Feed Forward Part
+    x = LayerNormalization(epsilon=1e-6)(res)
+    x = Dense(ff_dim, activation="relu")(x)
+    x = Dropout(dropout)(x)
+    x = Dense(inputs.shape[-1])(x) # Project back to input dimension
+    return Add()([x, res]) # Skip connection
+
+
+# ===============================================================================
 
 # ==============================================================================
 # SCRIPT CHÍNH (run_experiment.py)
@@ -89,6 +145,15 @@ if not df_with_indicators.empty:
     FEATURE_COLS = ['RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'BB_Upper', 'BB_Lower', 'EMA_20', 'volume']
     for p in LAG_PERIODS: FEATURE_COLS.append(f'pct_change_lag_{p}')
     TARGET_COL_PCT = 'target_pct_change'; TARGET_COL_TREND = 'target_trend'
+    # === Tham số cho Sequence Models ===
+    N_TIMESTEPS = 10  # Số ngày trong quá khứ để nhìn lại cho mỗi sequence
+    LSTM_UNITS = 50
+    TRANSFORMER_HEAD_SIZE = 64
+    TRANSFORMER_NUM_HEADS = 4
+    TRANSFORMER_FF_DIM = 64
+    DROPOUT_RATE = 0.1
+    EPOCHS = 15 # Số epochs huấn luyện (có thể cần tăng/giảm)
+    BATCH_SIZE = 64 # Kích thước batch (có thể cần tăng/giảm)
 
     # --- Tạo các split ---
     cv_splitter = create_time_series_cv_splits(df=df_with_indicators, date_col='date', ticker_col='ticker', initial_train_period=initial_train_td, test_period=test_td, step_period=step_td, expanding=USE_EXPANDING_WINDOW)
@@ -126,26 +191,52 @@ if not df_with_indicators.empty:
 
         # ---- 4. Align X và y (Lấy y_test_ml cuối cùng) ----
         valid_y_train_idx = y_train_trend_ml.dropna().index; valid_y_test_idx = y_test_trend_ml.dropna().index
-        # Chỉ cần lấy y_test_ml cuối cùng để đánh giá ARIMA
-        # X_train_ml = X_train_imputed.loc[valid_y_train_idx]; y_train_ml = y_train_trend_ml.loc[valid_y_train_idx] # Không cần cho ARIMA
-        # X_test_ml = X_test_imputed.loc[valid_y_test_idx] # Không cần cho ARIMA
-        y_test_final_trend = y_test_trend_ml.loc[valid_y_test_idx] # Đây là target trend thực tế cuối cùng
-
-        # Kiểm tra xem có đủ dữ liệu target không
-        if y_test_final_trend.empty:
-             print("  Skipping split: Empty final target data after alignment.")
-             continue
+        X_train_ml = X_train_imputed.loc[valid_y_train_idx]; y_train_ml = y_train_trend_ml.loc[valid_y_train_idx]
+        X_test_ml = X_test_imputed.loc[valid_y_test_idx]; y_test_ml = y_test_trend_ml.loc[valid_y_test_idx]
+        if X_train_ml.empty or X_test_ml.empty: 
+            print("  Skipping split: Empty ML data after alignment."); 
+            continue
 
         # ---- 5. Scaling Features (X_ml) ----
         # Vẫn thực hiện để giữ cấu trúc, dù ARIMA không dùng
-        # print("  Scaling ML features...") # Tắt bớt print
-        # scaler = StandardScaler(); X_train_scaled = scaler.fit_transform(X_train_ml); X_test_scaled = scaler.transform(X_test_ml)
-        # X_train_scaled_df = pd.DataFrame(X_train_scaled, index=X_train_ml.index, columns=X_train_ml.columns)
-        # X_test_scaled_df = pd.DataFrame(X_test_scaled, index=X_test_ml.index, columns=X_test_ml.columns)
+        print("  Scaling ML features...") # Tắt bớt print
+        scaler = StandardScaler(); X_train_scaled = scaler.fit_transform(X_train_ml); X_test_scaled = scaler.transform(X_test_ml)
+        X_train_scaled_df = pd.DataFrame(X_train_scaled, index=X_train_ml.index, columns=X_train_ml.columns)
+        X_test_scaled_df = pd.DataFrame(X_test_scaled, index=X_test_ml.index, columns=X_test_ml.columns)
 
+        # ---- 6. CHUẨN BỊ DỮ LIỆU CHO KERAS ----
+        # Chuyển đổi nhãn trend từ (-1, 0, 1) thành (0, 1, 2)
+        y_train_keras = y_train_ml + 1
+        y_test_keras = y_test_ml + 1
+        n_classes = 3 # Số lượng lớp (Giảm, Đi ngang, Tăng)
+
+        # Tạo sequences
+        print(f"  Creating sequences with time_steps={N_TIMESTEPS}...")
+        X_train_seq, y_train_seq = create_sequences(X_train_scaled, y_train_keras.values, N_TIMESTEPS)
+        X_test_seq, y_test_seq = create_sequences(X_test_scaled, y_test_keras.values, N_TIMESTEPS)
+
+        # Lấy lại nhãn gốc (-1, 0, 1) tương ứng với y_test_seq để đánh giá cuối cùng
+        # Index của y_test_seq sẽ tương ứng với N_TIMESTEPS dòng cuối của y_test_ml gốc
+        y_test_seq_original_trend = y_test_ml.iloc[N_TIMESTEPS:].values
+
+
+        print(f"  Sequence shapes: X_train={X_train_seq.shape}, y_train={y_train_seq.shape}, X_test={X_test_seq.shape}, y_test={y_test_seq.shape}")
+
+        if X_train_seq.shape[0] == 0 or X_test_seq.shape[0] == 0:
+            print("  Skipping sequence models: Not enough data to create sequences.")
+            TF_INSTALLED = False # Tạm thời coi như không cài TF để bỏ qua phần sau
+        else:
+             # Tính class weights cho dữ liệu train sequence (nhãn 0, 1, 2)
+             class_weights_keras = class_weight.compute_class_weight(
+                 'balanced',
+                 classes=np.unique(y_train_seq),
+                 y=y_train_seq
+             )
+             class_weight_dict = dict(enumerate(class_weights_keras))
+             print(f"  Class weights for Keras models: {class_weight_dict}")
 
         # --------------------------------------------------------------
-        # Phần 6: Chạy và đánh giá mô hình ARIMA
+        # Phần 7: Chạy và đánh giá mô hình ARIMA
         # --------------------------------------------------------------
         print("\n--- Training and Evaluating ARIMA Model ---")
         arima_predictions_all = []; arima_actual_trends_all = []
@@ -204,15 +295,141 @@ if not df_with_indicators.empty:
 
 
         # --------------------------------------------------------------
-        # Phần 7: Placeholder cho Mô hình Machine Learning (Tạm thời bỏ qua)
+        # Phần 8: Huấn luyện và đánh giá Mô hình Machine Learning
         # --------------------------------------------------------------
-        # print("\n--- Skipping ML Models for now ---")
-        # Thêm kết quả NaN hoặc mặc định cho ML để bảng tổng hợp có cột
-        results_this_split.update({
-            "RandomForest_Accuracy": np.nan, "RandomForest_F1_Macro": np.nan, "RandomForest_F1_Weighted": np.nan,
-            "XGBoost_Accuracy": np.nan, "XGBoost_F1_Macro": np.nan, "XGBoost_F1_Weighted": np.nan,
-            # Thêm cho LSTM, Transformer nếu muốn
-        })
+        print("\n--- Training and Evaluating ML Models ---")
+
+        # ===== CODE RANDOM FOREST =====
+        try:
+            from sklearn.ensemble import RandomForestClassifier
+            print("  Training RandomForest...")
+            rf_model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight='balanced', max_depth=10, min_samples_leaf=5)
+            rf_model.fit(X_train_scaled_df, y_train_ml)
+            print("  Predicting with RandomForest...")
+            rf_preds = rf_model.predict(X_test_scaled_df)
+            # ---- Đánh giá RF ----
+            rf_metrics_results = metrics.calculate_classification_metrics(y_test_ml, rf_preds, model_name="RandomForest")
+            results_this_split.update(rf_metrics_results)
+        except ImportError:
+             print("Error: scikit-learn not installed. Cannot run RandomForest.")
+             results_this_split.update({"RandomForest_Accuracy": np.nan, "RandomForest_F1_Macro": np.nan, "RandomForest_F1_Weighted": np.nan, "RandomForest_Precision_Macro": np.nan, "RandomForest_Recall_Macro": np.nan})
+        except Exception as e:
+             print(f"Error during RandomForest execution: {e}")
+             results_this_split.update({"RandomForest_Accuracy": np.nan, "RandomForest_F1_Macro": np.nan, "RandomForest_F1_Weighted": np.nan, "RandomForest_Precision_Macro": np.nan, "RandomForest_Recall_Macro": np.nan})
+        # ===========================
+
+        # ---- Thêm code cho XGBoost, LSTM, Transformer tại đây ----
+        # ===== LSTM =====
+        if TF_INSTALLED and X_train_seq.shape[0] > 0: # Chỉ chạy nếu TF được cài và có sequence data
+            print("\n  --- Training LSTM Model ---")
+            try:
+                keras.backend.clear_session() # Xóa session cũ nếu có
+                n_features = X_train_seq.shape[2]
+
+                lstm_model = Sequential([
+                    Input(shape=(N_TIMESTEPS, n_features)),
+                    LSTM(LSTM_UNITS, return_sequences=False), # Chỉ cần output cuối cùng
+                    Dropout(DROPOUT_RATE),
+                    Dense(n_classes, activation='softmax') # Output layer cho 3 lớp
+                ])
+
+                lstm_model.compile(loss='sparse_categorical_crossentropy', # Vì y là số nguyên (0, 1, 2)
+                                   optimizer='adam',
+                                   metrics=['accuracy'])
+                # print(lstm_model.summary()) # In cấu trúc model nếu cần
+
+                print(f"    Training LSTM for {EPOCHS} epochs...")
+                history_lstm = lstm_model.fit(
+                    X_train_seq,
+                    y_train_seq,
+                    epochs=EPOCHS,
+                    batch_size=BATCH_SIZE,
+                    class_weight=class_weight_dict, # Sử dụng class weights
+                    validation_split=0.1, # Dùng 10% train data để validation trong quá trình train
+                    shuffle=True, # Xáo trộn dữ liệu mỗi epoch
+                    verbose=0 # Đặt verbose=1 hoặc 2 để xem chi tiết quá trình train
+                )
+                print("    Training finished.")
+
+                print("    Predicting with LSTM...")
+                lstm_pred_probs = lstm_model.predict(X_test_seq)
+                lstm_pred_keras = np.argmax(lstm_pred_probs, axis=1) # Lấy index của lớp có xác suất cao nhất (0, 1, 2)
+                lstm_pred_trend = lstm_pred_keras - 1 # Chuyển về nhãn gốc (-1, 0, 1)
+
+                # ---- Đánh giá LSTM ----
+                lstm_metrics_results = metrics.calculate_classification_metrics(
+                    y_true=y_test_seq_original_trend, # So sánh với nhãn gốc
+                    y_pred=lstm_pred_trend,
+                    model_name="LSTM"
+                )
+                results_this_split.update(lstm_metrics_results)
+
+            except Exception as e:
+                print(f"Error during LSTM execution: {e}")
+                results_this_split.update({"LSTM_Accuracy": np.nan, "LSTM_F1_Macro": np.nan, "LSTM_F1_Weighted": np.nan}) # Cập nhật NaN
+        else:
+            print("  Skipping LSTM Model (TensorFlow not installed or no sequence data).")
+            results_this_split.update({"LSTM_Accuracy": np.nan, "LSTM_F1_Macro": np.nan, "LSTM_F1_Weighted": np.nan}) # Cập nhật NaN
+
+        # ===== Transformer =====
+        if TF_INSTALLED and X_train_seq.shape[0] > 0:
+            print("\n  --- Training Transformer Model ---")
+            try:
+                keras.backend.clear_session()
+                n_features = X_train_seq.shape[2]
+                input_shape = (N_TIMESTEPS, n_features)
+
+                inputs = Input(shape=input_shape)
+                # Xây dựng nhiều lớp encoder nếu muốn, ở đây dùng 1 lớp
+                x = transformer_encoder(inputs, TRANSFORMER_HEAD_SIZE, TRANSFORMER_NUM_HEADS, TRANSFORMER_FF_DIM, DROPOUT_RATE)
+                x = GlobalAveragePooling1D(data_format="channels_last")(x) # Hoặc Flatten()
+                x = Dropout(DROPOUT_RATE)(x)
+                outputs = Dense(n_classes, activation="softmax")(x)
+
+                transformer_model = keras.Model(inputs, outputs)
+
+                transformer_model.compile(loss="sparse_categorical_crossentropy",
+                                          optimizer="adam",
+                                          metrics=["accuracy"])
+                # print(transformer_model.summary())
+
+                print(f"    Training Transformer for {EPOCHS} epochs...")
+                history_transformer = transformer_model.fit(
+                    X_train_seq,
+                    y_train_seq,
+                    epochs=EPOCHS,
+                    batch_size=BATCH_SIZE,
+                    class_weight=class_weight_dict,
+                    validation_split=0.1,
+                    shuffle=True,
+                    verbose=0
+                )
+                print("    Training finished.")
+
+                print("    Predicting with Transformer...")
+                transformer_pred_probs = transformer_model.predict(X_test_seq)
+                transformer_pred_keras = np.argmax(transformer_pred_probs, axis=1)
+                transformer_pred_trend = transformer_pred_keras - 1
+
+                # ---- Đánh giá Transformer ----
+                transformer_metrics_results = metrics.calculate_classification_metrics(
+                    y_true=y_test_seq_original_trend,
+                    y_pred=transformer_pred_trend,
+                    model_name="Transformer"
+                )
+                results_this_split.update(transformer_metrics_results)
+
+            except Exception as e:
+                print(f"Error during Transformer execution: {e}")
+                results_this_split.update({"Transformer_Accuracy": np.nan, "Transformer_F1_Macro": np.nan, "Transformer_F1_Weighted": np.nan})
+        else:
+            print("  Skipping Transformer Model (TensorFlow not installed or no sequence data).")
+            results_this_split.update({"Transformer_Accuracy": np.nan, "Transformer_F1_Macro": np.nan, "Transformer_F1_Weighted": np.nan})
+
+
+        # Ví dụ placeholder cho XGBoost (để giữ cột trong kết quả cuối)
+        results_this_split.update({"XGBoost_Accuracy": np.nan, "XGBoost_F1_Macro": np.nan, "XGBoost_F1_Weighted": np.nan})
+        # Thêm placeholder tương tự cho LSTM, Transformer nếu bạn dự định chạy chúng
 
 
         # Lưu kết quả của split này vào dictionary tổng
@@ -226,16 +443,12 @@ if not df_with_indicators.empty:
         final_results_df = pd.DataFrame.from_dict(all_split_results, orient='index')
         print("\n--- Performance Summary (Mean +/- Std Dev) ---")
         summary = final_results_df.agg(['mean', 'std']).T
-        # Chỉ hiển thị các cột có giá trị (không phải NaN)
         summary_valid = summary.dropna(subset=['mean'])
         if not summary_valid.empty:
              summary_valid['mean_std'] = summary_valid.apply(lambda x: f"{x['mean']:.4f} +/- {x['std']:.4f}" if pd.notna(x['std']) else f"{x['mean']:.4f}", axis=1)
              print(summary_valid[['mean_std']])
-        else:
-             print("No valid performance metrics to display.")
-        # print(final_results_df) # In toàn bộ kết quả nếu muốn xem chi tiết từng split
-    else:
-        print("No results to aggregate.")
+        else: print("No valid performance metrics to display.")
+    else: print("No results to aggregate.")
 
 else:
     print("\nEnriched data is empty or could not be loaded.")
