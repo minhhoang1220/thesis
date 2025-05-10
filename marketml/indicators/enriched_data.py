@@ -1,23 +1,20 @@
+# File: marketml/indicators/create_enriched_data.py
 import pandas as pd
 from pathlib import Path
 import sys
 
-# Thêm thư mục gốc vào sys.path để import marketml thành công
-# Giả định script này nằm trong marketml/indicators/
-project_root = Path(__file__).resolve().parents[2] # Đi lên 2 cấp từ indicators/create_enriched_data.py đến .ndmh/
+# Thêm thư mục gốc vào sys.path
+project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
 # Import các module cần thiết TỪ marketml
 try:
     from marketml.data.loader import price_loader
-    from marketml.data.loader import preprocess
+    from marketml.data.loader import preprocess # Hàm add_technical_indicators nằm ở đây
 except ImportError as e:
-    print(f"Error importing marketml modules: {e}")
-    print(f"Ensure the project structure is correct and '{project_root}' is the project root.")
-    exit()
+    print(f"Error importing marketml modules: {e}"); exit()
 
-# Định nghĩa đường dẫn file output
-# Lưu vào thư mục data/processed/ (tạo nếu chưa có) so với thư mục gốc dự án
+# Đường dẫn file output
 OUTPUT_DIR = project_root / "marketml" / "data" / "processed"
 OUTPUT_FILE = OUTPUT_DIR / "price_data_with_indicators.csv"
 
@@ -33,7 +30,7 @@ def create_and_save_enriched_data():
         print("Real data loaded successfully.")
     except FileNotFoundError:
         print(f"Error: Raw data file not found. Check path in price_loader.py.")
-        return # Trả về thay vì exit để có thể test
+        return
     except Exception as e:
         print(f"Error loading data: {e}")
         return
@@ -62,8 +59,10 @@ def create_and_save_enriched_data():
         for ticker, group_df in standardized_df.groupby('ticker'):
             print(f"  Processing ticker: {ticker} ({len(group_df)} rows)")
             group_df_sorted = group_df.sort_values('date').copy()
-            # Gọi hàm từ preprocess để thêm TẤT CẢ các chỉ báo đã định nghĩa trong đó
-            group_with_indicators = preprocess.add_technical_indicators(group_df_sorted)
+            group_with_indicators = preprocess.add_technical_indicators(
+                group_df_sorted,
+                price_col='close'
+            )
             all_indicators_df_list.append(group_with_indicators)
             processed_tickers += 1
 
@@ -83,15 +82,24 @@ def create_and_save_enriched_data():
 
     # --- Bước 4: Lưu Dữ liệu đã làm giàu ---
     try:
-        print(f"\nSaving enriched data to: {OUTPUT_FILE}")
+        print(f"\nSaving enriched data to: {OUTPUT_FILE.resolve()}") # In đường dẫn tuyệt đối
         # Tạo thư mục nếu chưa tồn tại
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         df_with_indicators.to_csv(OUTPUT_FILE, index=False)
         print("Enriched data saved successfully.")
+
+        # === KHÔI PHỤC LỆNH PRINT ĐỂ XEM DỮ LIỆU ===
         print("\nFinal Data Info:")
         df_with_indicators.info()
-        print("\nFinal Data Sample (last 5 rows):")
-        print(df_with_indicators.tail().to_string())
+        print("\nFinal Data Sample (last 15 rows overall, for a sample ticker):")
+        if not df_with_indicators.empty:
+            # Lấy một ticker mẫu để hiển thị cho gọn
+            sample_ticker_display = df_with_indicators['ticker'].unique()[0]
+            print(f"--- Displaying last 15 rows for ticker: {sample_ticker_display} ---")
+            print(df_with_indicators[df_with_indicators['ticker'] == sample_ticker_display].tail(15).to_string())
+        else:
+            print("DataFrame is empty, no sample to display.")
+        # =========================================
 
     except Exception as e:
         print(f"\nError saving enriched data: {e}")
