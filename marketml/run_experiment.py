@@ -24,7 +24,6 @@ except ImportError: pass
 # === Import các module đã tách ===
 try:
     from marketml.utils import metrics
-    # Thêm xgboost_model vào import
     from marketml.models import (arima_model, rf_model, lstm_model,
                                  transformer_model, keras_utils, xgboost_model)
 except ModuleNotFoundError as e:
@@ -283,13 +282,43 @@ def run_all_experiments():
                 print("\n--- Performance Summary (Mean +/- Std Dev) ---")
                 summary = final_results_df.agg(['mean', 'std']).T
                 summary_valid = summary.dropna(subset=['mean']).copy() # Tránh SettingWithCopyWarning
+                summary_valid_for_display = summary.dropna(subset=['mean']).copy()
+                
                 if not summary_valid.empty:
                     summary_valid['mean_std'] = summary_valid.apply(lambda x: f"{x['mean']:.4f} +/- {x['std']:.4f}" if pd.notna(x['std']) else f"{x['mean']:.4f}", axis=1)
                     print(summary_valid[['mean_std']])
                 else:
                     print("No valid performance metrics to display after dropping NaNs.")
-                print("\nFull Results per Split:") # In chi tiết nếu cần debug
-                print(final_results_df)
+                    print("\nFull Results per Split:") # In chi tiết nếu cần debug
+                    print(final_results_df)
+            
+            # ===== LƯU KẾT QUẢ TỔNG HỢP RA CSV =====
+            try:
+                results_output_dir = project_root / "results"
+                results_output_dir.mkdir(parents=True, exist_ok=True)
+                results_file_path = results_output_dir / "model_performance_summary.csv"
+
+                # Lưu DataFrame summary gốc (chứa mean và std riêng biệt)
+                # Hoặc summary_valid nếu bạn muốn bỏ các metric không có mean
+                # Ưu tiên lưu summary_valid nếu nó không rỗng, ngược lại lưu summary
+                df_to_save = summary_valid_for_display.drop(columns=['mean_std_display']) if not summary_valid_for_display.empty and 'mean_std_display' in summary_valid_for_display else summary.copy()
+
+                if not df_to_save.empty:
+                    df_to_save.to_csv(results_file_path)
+                    print(f"\nPerformance summary (mean, std) saved to: {results_file_path.resolve()}")
+                else:
+                    print("No summary data to save.")
+
+
+                # Lưu kết quả chi tiết từng split
+                detailed_results_file_path = results_output_dir / "model_performance_detailed.csv"
+                final_results_df.to_csv(detailed_results_file_path)
+                print(f"Detailed results per split saved to: {detailed_results_file_path.resolve()}")
+
+            except Exception as e:
+                print(f"Error saving results to CSV: {e}")
+            # =======================================
+            
             else:
                 print("No results to aggregate after dropping NaN columns.")
         else:
