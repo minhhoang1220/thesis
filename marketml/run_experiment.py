@@ -25,7 +25,7 @@ except ImportError: pass
 try:
     from marketml.utils import metrics
     from marketml.models import (arima_model, rf_model, lstm_model,
-                                 transformer_model, keras_utils, xgboost_model)
+                                 transformer_model, keras_utils, xgboost_model, svm_model)
 except ModuleNotFoundError as e:
     print(f"Error importing necessary modules: {e}")
     print("Ensure the project structure is correct, __init__.py files exist,")
@@ -47,6 +47,15 @@ except ImportError:
     print("Warning: xgboost not installed. XGBoost model will be skipped.")
     XGB_INSTALLED = False
 # ========================
+
+# === SKLearn đã được kiểm tra gián tiếp qua các model khác ===
+# nhưng có thể thêm kiểm tra riêng nếu muốn
+try:
+    import sklearn
+    SKLEARN_INSTALLED = True
+except ImportError:
+    print("Warning: scikit-learn not installed. RF and SVM models might be skipped.")
+    SKLEARN_INSTALLED = False # Mặc dù rf_model.py và svm_model.py có kiểm tra riêng
 
 # ==============================================================================
 # HÀM TẠO CỬA SỔ ROLLING/EXPANDING (Giữ nguyên)
@@ -97,8 +106,17 @@ def prepare_split_data(train_df_orig, test_df_orig, feature_cols, lag_periods,
             for p in lag_periods: df_split[f'pct_change_lag_{p}'] = pct_change_col.shift(p)
 
         # ---- Impute & Align cho ML ----
-        X_train_raw = train_df[feature_cols]; X_test_raw = test_df[feature_cols]
+        X_train_raw = train_df[feature_cols].copy(); X_test_raw = test_df[feature_cols].copy()
         y_train_trend_ml = train_df[target_col_trend]; y_test_trend_ml = test_df[target_col_trend]
+
+        # Xử lý các cột toàn NaN TRƯỚC KHI impute
+        # Ví dụ: điền 0 cho garch_vol_forecast nếu nó toàn NaN trong train
+        if 'garch_vol_forecast' in X_train_raw.columns and X_train_raw['garch_vol_forecast'].isnull().all():
+            print("    Warning: 'garch_vol_forecast' is all NaN in X_train_raw. Filling with 0 before imputation.")
+            X_train_raw['garch_vol_forecast'] = X_train_raw['garch_vol_forecast'].fillna(0)
+            # Áp dụng tương tự cho X_test_raw (dùng giá trị 0 hoặc một chiến lược khác)
+            if 'garch_vol_forecast' in X_test_raw.columns:
+                X_test_raw['garch_vol_forecast'] = X_test_raw['garch_vol_forecast'].fillna(0)
 
         imputer = SimpleImputer(strategy='mean'); X_train_imputed_np = imputer.fit_transform(X_train_raw); X_test_imputed_np = imputer.transform(X_test_raw)
         X_train_imputed = pd.DataFrame(X_train_imputed_np, index=X_train_raw.index, columns=X_train_raw.columns)
@@ -172,7 +190,7 @@ def run_all_experiments():
     # --- Bước 1: Load Dữ liệu ĐÃ LÀM GIÀU ---
     project_root = Path(__file__).resolve().parent
     ENRICHED_DATA_DIR = project_root / "data" / "processed"
-    ENRICHED_DATA_FILE = ENRICHED_DATA_DIR / "price_data_with_indicators.csv"
+    ENRICHED_DATA_FILE = ENRICHED_DATA_DIR / "price_data_with_indicators_and_garch.csv"
 
     try:
         print(f"Loading enriched data from: {ENRICHED_DATA_FILE}")
@@ -182,7 +200,7 @@ def run_all_experiments():
     except Exception as e: print(f"Error loading enriched data: {e}"); exit()
 
     # --- Kiểm tra nhanh các cột ---
-    required_cols_final = ['date', 'ticker', 'close', 'RSI', 'MACD'] # Chỉ kiểm tra vài cột cơ bản
+    required_cols_final = ['date', 'ticker', 'close', 'RSI', 'MACD', 'garch_vol_forecast']
     missing_cols_final = [col for col in required_cols_final if col not in df_with_indicators.columns]
     if missing_cols_final: print(f"\nError: Missing expected columns: {missing_cols_final}"); exit()
     if not pd.api.types.is_datetime64_any_dtype(df_with_indicators['date']): print("\nError: 'date' column is not datetime type."); exit()
@@ -192,10 +210,12 @@ def run_all_experiments():
     if not df_with_indicators.empty:
         print("\nStarting Cross-Validation Runs...")
         # --- Định nghĩa tham số ---
-        INITIAL_TRAIN_YEARS = 3; TEST_YEARS = 1; STEP_YEARS = 1; USE_EXPANDING_WINDOW = False
+        INITIAL_TRAIN_YEARS = 2 # Đặt lại để có nhiều split hơn (ví dụ)
+        TEST_YEARS = 1; STEP_YEARS = 1; USE_EXPANDING_WINDOW = True # Thử Expanding
         initial_train_td = pd.Timedelta(days=365 * INITIAL_TRAIN_YEARS); test_td = pd.Timedelta(days=365 * TEST_YEARS); step_td = pd.Timedelta(days=365 * STEP_YEARS)
         TREND_THRESHOLD = 0.002; LAG_PERIODS = [1, 3, 5]
-        FEATURE_COLS_BASE = ['RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'BB_Upper', 'BB_Lower', 'EMA_20', 'volume']
+
+        FEATURE_COLS_BASE = ['RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'BB_Upper', 'BB_Lower', 'EMA_20', 'volume', 'garch_vol_forecast']
         FEATURE_COLS = FEATURE_COLS_BASE + [f'pct_change_lag_{p}' for p in LAG_PERIODS]
         TARGET_COL_PCT = 'target_pct_change'; TARGET_COL_TREND = 'target_trend'
         N_TIMESTEPS = 10; LSTM_UNITS = 50; TRANSFORMER_HEAD_SIZE = 64; TRANSFORMER_NUM_HEADS = 4
@@ -222,6 +242,16 @@ def run_all_experiments():
                     target_col_trend=TARGET_COL_TREND, trend_threshold=TREND_THRESHOLD)
                 results_this_split.update(arima_results)
 
+                # XÓA HOẶC COMMENT OUT PHẦN GARCH MODEL RIÊNG LẺ
+                # if ARCH_INSTALLED:
+                #     garch_results = garch_model.run_garch_analysis(...)
+                #     results_this_split.update(garch_results)
+                # else:
+                #     results_this_split.update({"GARCH_Accuracy": np.nan, ...})
+                # Thay vào đó, thêm placeholder NaN cho GARCH như một mô hình (nếu vẫn muốn cột đó)
+                results_this_split.update({"GARCH_Accuracy": np.nan, "GARCH_F1_Macro": np.nan, "GARCH_F1_Weighted": np.nan,
+                                           "GARCH_Precision_Macro": np.nan, "GARCH_Recall_Macro": np.nan})
+
                 # RandomForest
                 rf_results = rf_model.run_rf_evaluation(
                     X_train_scaled=prep_data['X_train_scaled'], y_train=prep_data['y_train_ml'],
@@ -239,6 +269,18 @@ def run_all_experiments():
                      results_this_split.update({"XGBoost_Accuracy": np.nan, "XGBoost_F1_Macro": np.nan, "XGBoost_F1_Weighted": np.nan,
                                                 "XGBoost_Precision_Macro": np.nan, "XGBoost_Recall_Macro": np.nan})
                 # =======================
+
+                # --- SVM (SVC) ---
+                if SKLEARN_INSTALLED: # Hoặc dựa vào svm_model.SKLEARN_AVAILABLE nếu có
+                    svm_results = svm_model.run_svm_evaluation(
+                        X_train_scaled=prep_data['X_train_scaled'], y_train=prep_data['y_train_ml'],
+                        X_test_scaled=prep_data['X_test_scaled'], y_test=prep_data['y_test_ml'],
+                        # Có thể truyền thêm tham số SVM tại đây, ví dụ: C=0.5, kernel='linear'
+                    )
+                    results_this_split.update(svm_results)
+                else:
+                    results_this_split.update({"SVM_Accuracy": np.nan, "SVM_F1_Macro": np.nan, "SVM_F1_Weighted": np.nan,
+                                               "SVM_Precision_Macro": np.nan, "SVM_Recall_Macro": np.nan})
 
                 # LSTM
                 lstm_results = lstm_model.run_lstm_evaluation(
@@ -271,61 +313,69 @@ def run_all_experiments():
             print(f"===== Finished CV Split {split_idx} =====")
             # break # Bỏ comment để chạy thử 1 split
 
-        # --- Bước 5: Tổng hợp và so sánh kết quả ---
+        # --- Bước 5: Tổng hợp và so sánh kết quả từ tất cả các split ---
         print("\n===== Aggregating Results Across All Splits =====")
-        if all_split_results:
+        if all_split_results: # Kiểm tra xem có kết quả từ bất kỳ split nào không
             final_results_df = pd.DataFrame.from_dict(all_split_results, orient='index')
-            # Loại bỏ các cột toàn NaN trước khi tính toán thống kê
+            # Loại bỏ các cột mà TẤT CẢ các giá trị đều là NaN (ví dụ nếu một mô hình không chạy được ở tất cả các split)
             final_results_df.dropna(axis=1, how='all', inplace=True)
+
+            # Khởi tạo các DataFrame sẽ lưu
+            df_to_save_summary = pd.DataFrame()
+            df_to_save_detailed = final_results_df # Sẽ lưu df này nếu nó không rỗng
 
             if not final_results_df.empty:
                 print("\n--- Performance Summary (Mean +/- Std Dev) ---")
                 summary = final_results_df.agg(['mean', 'std']).T
-                summary_valid = summary.dropna(subset=['mean']).copy() # Tránh SettingWithCopyWarning
-                summary_valid_for_display = summary.dropna(subset=['mean']).copy()
-                
+                # summary_valid chỉ lấy các hàng (metrics) mà giá trị 'mean' không phải là NaN
+                summary_valid = summary.dropna(subset=['mean']).copy() # Thêm .copy()
+
                 if not summary_valid.empty:
-                    summary_valid['mean_std'] = summary_valid.apply(lambda x: f"{x['mean']:.4f} +/- {x['std']:.4f}" if pd.notna(x['std']) else f"{x['mean']:.4f}", axis=1)
-                    print(summary_valid[['mean_std']])
+                    summary_valid_for_display = summary_valid.copy() # Tạo bản sao để thêm cột hiển thị
+                    summary_valid_for_display['mean_std_display_col'] = summary_valid_for_display.apply(
+                        lambda x: f"{x['mean']:.4f} +/- {x['std']:.4f}" if pd.notna(x['std']) else f"{x['mean']:.4f}", axis=1
+                    )
+                    print(summary_valid_for_display[['mean_std_display_col']])
+                    df_to_save_summary = summary_valid # Gán summary_valid (chỉ có 'mean', 'std') để lưu
                 else:
-                    print("No valid performance metrics to display after dropping NaNs.")
-                    print("\nFull Results per Split:") # In chi tiết nếu cần debug
-                    print(final_results_df)
-            
-            # ===== LƯU KẾT QUẢ TỔNG HỢP RA CSV =====
-            try:
-                results_output_dir = project_root / "results"
-                results_output_dir.mkdir(parents=True, exist_ok=True)
-                results_file_path = results_output_dir / "model_performance_summary.csv"
+                    print("No valid performance metrics (with mean) to display after dropping NaN rows from summary.")
+                    # df_to_save_summary vẫn là DataFrame rỗng
 
-                # Lưu DataFrame summary gốc (chứa mean và std riêng biệt)
-                # Hoặc summary_valid nếu bạn muốn bỏ các metric không có mean
-                # Ưu tiên lưu summary_valid nếu nó không rỗng, ngược lại lưu summary
-                df_to_save = summary_valid_for_display.drop(columns=['mean_std_display']) if not summary_valid_for_display.empty and 'mean_std_display' in summary_valid_for_display else summary.copy()
+                # ===== LƯU KẾT QUẢ TỔNG HỢP VÀ CHI TIẾT RA CSV =====
+                try:
+                    results_output_dir = project_root / "results"
+                    results_output_dir.mkdir(parents=True, exist_ok=True)
 
-                if not df_to_save.empty:
-                    df_to_save.to_csv(results_file_path)
-                    print(f"\nPerformance summary (mean, std) saved to: {results_file_path.resolve()}")
-                else:
-                    print("No summary data to save.")
+                    # 1. Lưu file summary (chỉ chứa mean, std của các metric hợp lệ)
+                    summary_file_path = results_output_dir / "model_performance_summary.csv"
+                    if not df_to_save_summary.empty:
+                        df_to_save_summary.to_csv(summary_file_path)
+                        print(f"\nPerformance summary (mean, std) saved to: {summary_file_path.resolve()}")
+                    else:
+                        print("No summary data (mean, std) to save.")
 
+                    # 2. Lưu kết quả chi tiết của từng split (nếu final_results_df không rỗng)
+                    # df_to_save_detailed đã được gán là final_results_df ở trên
+                    detailed_results_file_path = results_output_dir / "model_performance_detailed.csv"
+                    if not df_to_save_detailed.empty:
+                        df_to_save_detailed.to_csv(detailed_results_file_path)
+                        print(f"Detailed results per split saved to: {detailed_results_file_path.resolve()}")
+                    else:
+                        # Điều này không nên xảy ra nếu all_split_results có dữ liệu
+                        # và final_results_df không rỗng sau khi dropna(axis=1)
+                        print("No detailed results per split to save (final_results_df was empty).")
 
-                # Lưu kết quả chi tiết từng split
-                detailed_results_file_path = results_output_dir / "model_performance_detailed.csv"
-                final_results_df.to_csv(detailed_results_file_path)
-                print(f"Detailed results per split saved to: {detailed_results_file_path.resolve()}")
+                except Exception as e:
+                    print(f"Error saving results to CSV: {e}")
+                # =================================================
 
-            except Exception as e:
-                print(f"Error saving results to CSV: {e}")
-            # =======================================
-            
-            else:
-                print("No results to aggregate after dropping NaN columns.")
-        else:
-            print("No results to aggregate.")
+            else: # final_results_df rỗng sau khi drop cột toàn NaN
+                print("No results to aggregate after dropping all-NaN columns from final_results_df.")
+        else: # all_split_results rỗng
+            print("No results from any split to aggregate.")
 
-    else:
-        print("\nEnriched data is empty or could not be loaded.")
+    else: # df_with_indicators rỗng
+        print("\nEnriched data is empty or could not be loaded. No experiments run.")
 
     print("\nScript finished.")
 

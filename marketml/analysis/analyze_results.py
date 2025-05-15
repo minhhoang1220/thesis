@@ -21,7 +21,7 @@ METRICS_TO_PLOT = [
     "_Recall_Macro"
 ]
 
-MODEL_NAMES = ["ARIMA", "RandomForest", "XGBoost", "LSTM", "Transformer"] # Cập nhật nếu có thêm/bớt mô hình
+MODEL_NAMES = ["ARIMA", "RandomForest", "XGBoost", "LSTM", "Transformer", "SVM"] # Cập nhật nếu có thêm/bớt mô hình
 
 def load_summary_results(file_path=SUMMARY_FILE):
     """Tải dữ liệu tóm tắt hiệu suất từ file CSV."""
