@@ -1,4 +1,4 @@
-#Gọi yfinance.Ticker().financials để lấy báo cáo tài chính (Income Statement, Balance Sheet, Cash Flow Statement) của 30 công ty
+#.ndmh/marketml/data/loader/finance_loader.py
 import pandas as pd
 from pathlib import Path
 

@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-# Relative Strength Index (RSI) - CẬP NHẬT CÁCH TÍNH
+# Relative Strength Index (RSI)
 def compute_rsi(df: pd.DataFrame, column: str = 'close', window: int = 14) -> pd.DataFrame:
     """
     Tính toán Relative Strength Index (RSI) sử dụng Exponential Moving Average (EMA)
@@ -17,9 +17,7 @@ def compute_rsi(df: pd.DataFrame, column: str = 'close', window: int = 14) -> pd
     avg_gain = gain.ewm(com=window - 1, min_periods=window, adjust=False).mean()
     avg_loss = loss.ewm(com=window - 1, min_periods=window, adjust=False).mean()
 
-    # Thêm một epsilon nhỏ vào mẫu số để tránh chia cho 0
-    # Đặc biệt quan trọng nếu avg_loss có thể là 0 trong một số trường hợp
-    rs = avg_gain / (avg_loss + 1e-9)
+    rs = avg_gain / (avg_loss + 1e-9) #Make sure not to divide by zero
     rsi = 100.0 - (100.0 / (1.0 + rs))
 
     df['RSI'] = rsi

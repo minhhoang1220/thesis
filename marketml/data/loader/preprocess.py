@@ -6,10 +6,7 @@ try:
 except ModuleNotFoundError:
     print("Error: Could not import 'marketml.indicators.ta_indicators' in preprocess.py.")
     print("Ensure the project structure allows this import.")
-    # Nếu không import được, các hàm compute_... sẽ không tồn tại
-    # Cần xử lý hoặc để script lỗi ở đây để người dùng biết
-    ta_indicators = None # Hoặc raise lỗi
-
+    ta_indicators = None
 
 def standardize_data(df: pd.DataFrame, remove_columns: list[str] = None) -> pd.DataFrame:
     df = df.copy()
@@ -38,7 +35,6 @@ def standardize_data(df: pd.DataFrame, remove_columns: list[str] = None) -> pd.D
             df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
-# CẬP NHẬT HÀM NÀY
 def add_technical_indicators(
     df: pd.DataFrame,
     price_col: str = 'close',
@@ -97,7 +93,6 @@ def add_technical_indicators(
         # Lưu ý: Hàm compute_sma đã tự tạo tên cột f'SMA_{window}'
         df_out = ta_indicators.compute_sma(df_out, column=price_col, window=sma_window)
     if 'ema' in indicators_to_add:
-        # Tương tự cho EMA
         df_out = ta_indicators.compute_ema(df_out, column=price_col, window=ema_window)
 
     return df_out
