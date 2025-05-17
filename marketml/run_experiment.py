@@ -190,7 +190,7 @@ def run_all_experiments():
     # --- Bước 1: Load Dữ liệu ĐÃ LÀM GIÀU ---
     project_root = Path(__file__).resolve().parent
     ENRICHED_DATA_DIR = project_root / "data" / "processed"
-    ENRICHED_DATA_FILE = ENRICHED_DATA_DIR / "price_data_with_indicators_and_garch.csv"
+    ENRICHED_DATA_FILE = ENRICHED_DATA_DIR / "price_data_enriched_v2.csv"
 
     try:
         print(f"Loading enriched data from: {ENRICHED_DATA_FILE}")
@@ -200,7 +200,7 @@ def run_all_experiments():
     except Exception as e: print(f"Error loading enriched data: {e}"); exit()
 
     # --- Kiểm tra nhanh các cột ---
-    required_cols_final = ['date', 'ticker', 'close', 'RSI', 'MACD', 'garch_vol_forecast']
+    required_cols_final = ['date', 'ticker', 'close', 'RSI', 'MACD', 'garch_vol_forecast', 'OBV', 'close_roll_mean_5', 'RSI_roll_std_10', 'close_zscore_20']
     missing_cols_final = [col for col in required_cols_final if col not in df_with_indicators.columns]
     if missing_cols_final: print(f"\nError: Missing expected columns: {missing_cols_final}"); exit()
     if not pd.api.types.is_datetime64_any_dtype(df_with_indicators['date']): print("\nError: 'date' column is not datetime type."); exit()
@@ -210,31 +210,40 @@ def run_all_experiments():
     if not df_with_indicators.empty:
         print("\nStarting Cross-Validation Runs...")
         # --- Định nghĩa tham số ---
-        INITIAL_TRAIN_YEARS = 2 # Đặt lại để có nhiều split hơn (ví dụ)
+        INITIAL_TRAIN_YEARS = 1 # Đặt lại để có nhiều split hơn (ví dụ)
         TEST_YEARS = 1; STEP_YEARS = 1; USE_EXPANDING_WINDOW = True # Thử Expanding
         initial_train_td = pd.Timedelta(days=365 * INITIAL_TRAIN_YEARS); test_td = pd.Timedelta(days=365 * TEST_YEARS); step_td = pd.Timedelta(days=365 * STEP_YEARS)
         TREND_THRESHOLD = 0.002; LAG_PERIODS = [1, 3, 5]
 
-        FEATURE_COLS_BASE = ['RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'BB_Upper', 'BB_Lower', 'EMA_20', 'volume', 'garch_vol_forecast']
+        FEATURE_COLS_BASE = [ 'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'BB_Upper', 'BB_Lower', 'EMA_20', 'volume', 'garch_vol_forecast', 'OBV', 
+                             'close_roll_mean_5', 'close_roll_std_5', 
+                             'close_roll_mean_10', 'close_roll_std_10',
+                             'RSI_roll_mean_5', 'RSI_roll_std_5',
+                             'RSI_roll_mean_10', 'RSI_roll_std_10',
+                             'close_zscore_20']
         FEATURE_COLS = FEATURE_COLS_BASE + [f'pct_change_lag_{p}' for p in LAG_PERIODS]
+        # Đảm bảo không có cột trùng lặp
+        FEATURE_COLS = sorted(list(set(FEATURE_COLS)))
+        print(f"\nUsing the following {len(FEATURE_COLS)} features for ML models: {FEATURE_COLS}")
         TARGET_COL_PCT = 'target_pct_change'; TARGET_COL_TREND = 'target_trend'
         # === Tham số cho Tuning (truyền vào các hàm model) ===
-        N_ITER_SEARCH_SKLEARN = 15 # Số lần thử cho RF, XGB, SVM (tăng lên nếu có thời gian)
+        N_ITER_SEARCH_SKLEARN = 30 # Số lần thử cho RF, XGB, SVM (tăng lên nếu có thời gian)
         CV_FOLDS_TUNING_SKLEARN = 3 # Số fold CV cho tuning RF, XGB, SVM
 
         # --- Tham số Keras (có thể tạo dict để truyền) ---
         N_TIMESTEPS = 10
-        KERAS_EPOCHS = 30 # Tăng epochs, dùng EarlyStopping
+        KERAS_EPOCHS = 50 # Tăng epochs, dùng EarlyStopping
         KERAS_BATCH_SIZE = 64 # Thử 32, 64
-        KERAS_DROPOUT_RATE = 0.2 # Rate chung, có thể tùy chỉnh riêng
-        KERAS_LEARNING_RATE = 1e-4
+        KERAS_DROPOUT_RATE = 0.25 # Rate chung, có thể tùy chỉnh riêng
+        KERAS_LEARNING_RATE = 5e-5
 
         # LSTM params (ví dụ 1 bộ)
-        lstm_params_set = {'lstm_units': 64, 'dropout_rate': 0.3, 'learning_rate': KERAS_LEARNING_RATE, 'epochs': KERAS_EPOCHS, 'batch_size': KERAS_BATCH_SIZE}
+        lstm_params_set = {'lstm_units': 128, 'dropout_rate': KERAS_DROPOUT_RATE, 'learning_rate': KERAS_LEARNING_RATE, 'epochs': KERAS_EPOCHS, 'batch_size': KERAS_BATCH_SIZE}
         # Transformer params (ví dụ 1 bộ)
         transformer_params_set = {
-            'num_transformer_blocks': 2, 'head_size': 64, 'num_heads': 2,
-            'ff_dim': 64, 'dropout_rate': 0.25, 'learning_rate': KERAS_LEARNING_RATE,
+            'num_transformer_blocks': 2, 'head_size': 128, 'num_heads': 4, # Tăng head_size, num_heads
+            'ff_dim': 128, 'dropout_rate': KERAS_DROPOUT_RATE + 0.1, # Tăng dropout cho Transformer
+            'learning_rate': KERAS_LEARNING_RATE,
             'epochs': KERAS_EPOCHS, 'batch_size': KERAS_BATCH_SIZE
         }
         # ====================================================
@@ -304,20 +313,23 @@ def run_all_experiments():
                                                "SVM_Precision_Macro": np.nan, "SVM_Recall_Macro": np.nan})
 
                 # LSTM (truyền tham số)
+                current_n_features = prep_data['X_train_scaled'].shape[1] if prep_data['X_train_scaled'].ndim == 2 else prep_data['X_train_seq'].shape[2]
+
                 lstm_results = lstm_model.run_lstm_evaluation(
                     prep_data['X_train_seq'], prep_data['y_train_seq'], prep_data['X_test_seq'],
                     prep_data['y_test_seq_original_trend'], prep_data['class_weight_dict'], prep_data['n_classes'],
-                    N_TIMESTEPS, len(FEATURE_COLS),
-                    **lstm_params_set # Truyền dict tham số
+                    N_TIMESTEPS, current_n_features, # SỬ DỤNG current_n_features
+                    **lstm_params_set
                 )
                 results_this_split.update(lstm_results)
+
 
                 # Transformer (truyền tham số)
                 transformer_results = transformer_model.run_transformer_evaluation(
                     prep_data['X_train_seq'], prep_data['y_train_seq'], prep_data['X_test_seq'],
                     prep_data['y_test_seq_original_trend'], prep_data['class_weight_dict'], prep_data['n_classes'],
-                    N_TIMESTEPS, len(FEATURE_COLS),
-                    **transformer_params_set # Truyền dict tham số
+                    N_TIMESTEPS, current_n_features, # SỬ DỤNG current_n_features
+                    **transformer_params_set
                 )
                 results_this_split.update(transformer_results)
 
@@ -335,35 +347,41 @@ def run_all_experiments():
 
         # --- Bước 5: Tổng hợp và so sánh kết quả từ tất cả các split ---
         print("\n===== Aggregating Results Across All Splits =====")
-        if all_split_results: # Kiểm tra xem có kết quả từ bất kỳ split nào không
+        if all_split_results:  # Chỉ tiếp tục nếu có kết quả từ ít nhất một split
             final_results_df = pd.DataFrame.from_dict(all_split_results, orient='index')
-            # Loại bỏ các cột mà TẤT CẢ các giá trị đều là NaN (ví dụ nếu một mô hình không chạy được ở tất cả các split)
+            # Loại bỏ các cột mà TẤT CẢ các giá trị trong cột đó là NaN
             final_results_df.dropna(axis=1, how='all', inplace=True)
 
             # Khởi tạo các DataFrame sẽ lưu
-            df_to_save_summary = pd.DataFrame()
-            df_to_save_detailed = final_results_df # Sẽ lưu df này nếu nó không rỗng
+            df_to_save_summary = pd.DataFrame() # Sẽ chứa mean, std của các metric hợp lệ
+            df_to_save_detailed = final_results_df.copy() # Luôn lưu final_results_df nếu nó không rỗng (sau khi drop cột toàn NaN)
 
-            if not final_results_df.empty:
+            if not final_results_df.empty: # Nếu còn lại bất kỳ cột nào sau khi dropna(axis=1, how='all')
                 print("\n--- Performance Summary (Mean +/- Std Dev) ---")
-                numeric_metric_cols = [col for col in final_results_df.columns
-                    if "Accuracy" in col or "F1" in col or "Precision" in col or "Recall" in col]
-            if not numeric_metric_cols:
-                print("No numeric metric columns found in results to aggregate.")
-                summary_valid = pd.DataFrame() # Khởi tạo rỗng nếu không có cột số
-            else:
-                summary = final_results_df[numeric_metric_cols].agg(['mean', 'std']).T
-                summary_valid = summary.dropna(subset=['mean']).copy()
 
-                if not summary_valid.empty:
-                    summary_valid_for_display = summary_valid.copy() # Tạo bản sao để thêm cột hiển thị
-                    summary_valid_for_display['mean_std_display_col'] = summary_valid_for_display.apply(
-                        lambda x: f"{x['mean']:.4f} +/- {x['std']:.4f}" if pd.notna(x['std']) else f"{x['mean']:.4f}", axis=1
-                    )
-                    print(summary_valid_for_display[['mean_std_display_col']])
-                    df_to_save_summary = summary_valid # Gán summary_valid (chỉ có 'mean', 'std') để lưu
+                # 1. Xác định các cột metrics là số để tính toán
+                numeric_metric_cols = [
+                    col for col in final_results_df.columns
+                    if "Accuracy" in col or "F1" in col or "Precision" in col or "Recall" in col
+                ]
+
+                if numeric_metric_cols: # Nếu có cột metric số nào tồn tại
+                    summary = final_results_df[numeric_metric_cols].agg(['mean', 'std']).T
+                    # summary_valid chỉ lấy các hàng (metrics) mà giá trị 'mean' không phải là NaN
+                    summary_valid = summary.dropna(subset=['mean']).copy()
+
+                    if not summary_valid.empty:
+                        summary_valid_for_display = summary_valid.copy()
+                        summary_valid_for_display['mean_std_display_col'] = summary_valid_for_display.apply(
+                            lambda x: f"{x['mean']:.4f} +/- {x['std']:.4f}" if pd.notna(x['std']) else f"{x['mean']:.4f}", axis=1
+                        )
+                        print(summary_valid_for_display[['mean_std_display_col']])
+                        df_to_save_summary = summary_valid # DataFrame này chứa mean, std để lưu
+                    else:
+                        print("No valid performance metrics (with non-NaN mean) to display in summary.")
+                        # df_to_save_summary vẫn là DataFrame rỗng
                 else:
-                    print("No valid performance metrics (with mean) to display after dropping NaN rows from summary.")
+                    print("No numeric metric columns found in results to aggregate for summary.")
                     # df_to_save_summary vẫn là DataFrame rỗng
 
                 # ===== LƯU KẾT QUẢ TỔNG HỢP VÀ CHI TIẾT RA CSV =====
@@ -371,30 +389,29 @@ def run_all_experiments():
                     results_output_dir = project_root / "results"
                     results_output_dir.mkdir(parents=True, exist_ok=True)
 
-                    # 1. Lưu file summary (chỉ chứa mean, std của các metric hợp lệ)
+                    # Lưu file summary (chỉ chứa mean, std của các metric hợp lệ)
                     summary_file_path = results_output_dir / "model_performance_summary.csv"
                     if not df_to_save_summary.empty:
                         df_to_save_summary.to_csv(summary_file_path)
                         print(f"\nPerformance summary (mean, std) saved to: {summary_file_path.resolve()}")
                     else:
-                        print("No summary data (mean, std) to save.")
+                        print("No summary data (mean, std) to save (empty or all NaNs after aggregation).")
 
-                    # 2. Lưu kết quả chi tiết của từng split (nếu final_results_df không rỗng)
-                    # df_to_save_detailed đã được gán là final_results_df ở trên
+                    # Lưu kết quả chi tiết của từng split (df_to_save_detailed là final_results_df đã được xử lý)
                     detailed_results_file_path = results_output_dir / "model_performance_detailed.csv"
-                    if not df_to_save_detailed.empty:
+                    if not df_to_save_detailed.empty: # df_to_save_detailed là final_results_df
                         df_to_save_detailed.to_csv(detailed_results_file_path)
                         print(f"Detailed results per split saved to: {detailed_results_file_path.resolve()}")
                     else:
-                        # Điều này không nên xảy ra nếu all_split_results có dữ liệu
-                        # và final_results_df không rỗng sau khi dropna(axis=1)
-                        print("No detailed results per split to save (final_results_df was empty).")
+                        print("No detailed results per split to save (final_results_df was empty or became empty after dropping all-NaN columns).")
 
                 except Exception as e:
                     print(f"Error saving results to CSV: {e}")
                 # =================================================
 
-        else: # all_split_results rỗng
+            else: # final_results_df rỗng sau khi drop cột toàn NaN
+                print("No results to aggregate (final_results_df is empty after dropping all-NaN columns).")
+        else: # all_split_results rỗng ngay từ đầu
             print("No results from any split to aggregate.")
 
     else: # df_with_indicators rỗng

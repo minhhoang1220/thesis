@@ -27,7 +27,7 @@ except ImportError:
 
 # Đường dẫn file output
 OUTPUT_DIR = project_root / "marketml" / "data" / "processed"
-OUTPUT_FILE = OUTPUT_DIR / "price_data_with_indicators_and_garch.csv"
+OUTPUT_FILE = OUTPUT_DIR / "price_data_enriched_v2.csv"
 
 # --- Tham số cho GARCH feature ---
 GARCH_WINDOW = 252 # Fit GARCH trên 252 ngày (~1 năm) gần nhất
@@ -63,7 +63,8 @@ def calculate_garch_volatility_feature(series_returns: pd.Series, window: int, h
             forecast = res.forecast(horizon=horizon, reindex=False) # reindex=False để lấy dự báo cho điểm tiếp theo của cửa sổ
             # Lấy variance dự báo cho bước đầu tiên (h=1)
             predicted_variance = forecast.variance.iloc[-1, 0] # Lấy giá trị cuối cùng của hàng cuối cùng, cột đầu tiên (h.1)
-            volatility_forecasts.iloc[i] = np.sqrt(predicted_variance) / 100 # Chia lại cho 100 để về thang đo gốc của return
+            if i < len(volatility_forecasts):
+                volatility_forecasts.iloc[i] = np.sqrt(predicted_variance) / 100 # Chia lại cho 100 để về thang đo gốc của return
         except Exception as e:
             # print(f"GARCH fit/forecast error at index {i}: {e}") # Bỏ comment để debug
             pass # Bỏ qua nếu GARCH không hội tụ
@@ -119,7 +120,8 @@ def create_and_save_enriched_data():
         # print(f"    Adding other TA indicators for {ticker}...") # Tắt bớt print
         group_with_ta = preprocess.add_technical_indicators(
             group_df_sorted, # Dùng df đã có thể có cột garch_vol
-            price_col='close'
+            price_col='close',
+            volume_col='volume'
         )
         all_enriched_df_list.append(group_with_ta)
         processed_tickers_count += 1

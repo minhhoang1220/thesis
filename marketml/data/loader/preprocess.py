@@ -4,9 +4,10 @@ import numpy as np # Cần numpy cho np.select
 try:
     from marketml.indicators import ta_indicators
 except ModuleNotFoundError:
-    print("Error: Could not import 'marketml.indicators.ta_indicators' in preprocess.py.")
-    print("Ensure the project structure allows this import.")
+    print("CRITICAL ERROR in preprocess.py: Could not import 'marketml.indicators.ta_indicators'.")
+    print("Ensure the project structure allows this import and ta_indicators.py exists.")
     ta_indicators = None
+    raise
 
 def standardize_data(df: pd.DataFrame, remove_columns: list[str] = None) -> pd.DataFrame:
     df = df.copy()
@@ -38,15 +39,14 @@ def standardize_data(df: pd.DataFrame, remove_columns: list[str] = None) -> pd.D
 def add_technical_indicators(
     df: pd.DataFrame,
     price_col: str = 'close',
+    volume_col: str = 'volume',
     indicators_to_add: list[str] = None,
     rsi_window: int = 14,
-    macd_fast: int = 12,
-    macd_slow: int = 26,
-    macd_signal: int = 9,
-    bb_window: int = 20,
-    bb_num_std: int = 2,
-    sma_window: int = 20,
-    ema_window: int = 20
+    macd_fast: int = 12, macd_slow: int = 26, macd_signal: int = 9,
+    bb_window: int = 20, bb_num_std: int = 2,
+    sma_window: int = 20, ema_window: int = 20,
+    rolling_stat_windows: list = None, 
+    price_zscore_window: int = 20
 ) -> pd.DataFrame:
     """
     Thêm các chỉ báo kỹ thuật được chọn vào DataFrame.
@@ -75,24 +75,61 @@ def add_technical_indicators(
     df_out = df.copy()
 
     if price_col not in df_out.columns:
-        raise ValueError(f"DataFrame must contain the price column '{price_col}' for technical indicators.")
+        raise ValueError(f"DataFrame must contain the price column '{price_col}' for TA.")
     if not pd.api.types.is_numeric_dtype(df_out[price_col]):
-         raise ValueError(f"Price column '{price_col}' must be numeric.")
+        raise ValueError(f"Price column '{price_col}' must be numeric for TA.")
 
     if indicators_to_add is None:
-        indicators_to_add = ['rsi', 'macd', 'bollinger', 'sma', 'ema'] # Mặc định
+        indicators_to_add = [
+            'rsi', 'macd', 'bollinger', 'sma', 'ema', # Chỉ báo cũ
+            'obv', 'rolling_close', 'rolling_rsi', 'price_zscore' # Chỉ báo mới
+        ]
+        print(f"  Adding indicators: {', '.join(indicators_to_add)}")
 
     if 'rsi' in indicators_to_add:
+        print(f"    Computing RSI (window={rsi_window})...")
         df_out = ta_indicators.compute_rsi(df_out, column=price_col, window=rsi_window)
     if 'macd' in indicators_to_add:
+        print(f"    Computing MACD (fast={macd_fast}, slow={macd_slow}, signal={macd_signal})...")
         df_out = ta_indicators.compute_macd(df_out, column=price_col, fast=macd_fast, slow=macd_slow, signal=macd_signal)
     if 'bollinger' in indicators_to_add:
+        print(f"    Computing Bollinger Bands (window={bb_window}, std={bb_num_std})...")
         df_out = ta_indicators.compute_bollinger_bands(df_out, column=price_col, window=bb_window, num_std=bb_num_std)
     if 'sma' in indicators_to_add:
-        # Sử dụng sma_window cho cả tên cột và tính toán
-        # Lưu ý: Hàm compute_sma đã tự tạo tên cột f'SMA_{window}'
+        print(f"    Computing SMA_{sma_window}...")
         df_out = ta_indicators.compute_sma(df_out, column=price_col, window=sma_window)
     if 'ema' in indicators_to_add:
+        print(f"    Computing EMA_{ema_window}...")
         df_out = ta_indicators.compute_ema(df_out, column=price_col, window=ema_window)
+    # On-Balance Volume
+    if 'obv' in indicators_to_add:
+        if volume_col not in df_out.columns:
+            print(f"    Warning: Volume column '{volume_col}' not found for OBV. Skipping OBV.")
+        elif not pd.api.types.is_numeric_dtype(df_out[volume_col]):
+            print(f"    Warning: Volume column '{volume_col}' is not numeric. Skipping OBV.")
+        else:
+            print(f"    Computing OBV...")
+            df_out = ta_indicators.compute_obv(df_out, close_col=price_col, volume_col=volume_col)
+
+    # Rolling stats cho giá đóng cửa
+    if 'rolling_close' in indicators_to_add:
+        # Đặt giá trị mặc định cho rolling_stat_windows nếu nó là None
+        current_rolling_windows = rolling_stat_windows if rolling_stat_windows is not None else [5, 10]
+        print(f"    Computing Rolling Stats for '{price_col}' (windows={current_rolling_windows})...")
+        df_out = ta_indicators.compute_rolling_stats(df_out, column=price_col, windows=current_rolling_windows, stats=['mean', 'std'])
+
+    # Rolling stats cho RSI (chỉ tính nếu RSI đã được tính)
+    if 'rolling_rsi' in indicators_to_add:
+        if 'RSI' in df_out.columns:
+            current_rolling_windows_rsi = rolling_stat_windows if rolling_stat_windows is not None else [5, 10]
+            print(f"    Computing Rolling Stats for 'RSI' (windows={current_rolling_windows_rsi})...")
+            df_out = ta_indicators.compute_rolling_stats(df_out, column='RSI', windows=current_rolling_windows_rsi, stats=['mean', 'std'])
+        else:
+            print("    Warning: Cannot compute rolling RSI because RSI was not calculated or added. Skipping.")
+
+    # Z-score của giá
+    if 'price_zscore' in indicators_to_add:
+        print(f"    Computing Price Z-score (window={price_zscore_window})...")
+        df_out = ta_indicators.compute_price_zscore(df_out, close_col=price_col, window=price_zscore_window)
 
     return df_out
