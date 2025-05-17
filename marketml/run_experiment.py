@@ -218,8 +218,26 @@ def run_all_experiments():
         FEATURE_COLS_BASE = ['RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'BB_Upper', 'BB_Lower', 'EMA_20', 'volume', 'garch_vol_forecast']
         FEATURE_COLS = FEATURE_COLS_BASE + [f'pct_change_lag_{p}' for p in LAG_PERIODS]
         TARGET_COL_PCT = 'target_pct_change'; TARGET_COL_TREND = 'target_trend'
-        N_TIMESTEPS = 10; LSTM_UNITS = 50; TRANSFORMER_HEAD_SIZE = 64; TRANSFORMER_NUM_HEADS = 4
-        TRANSFORMER_FF_DIM = 64; DROPOUT_RATE = 0.1; EPOCHS = 15; BATCH_SIZE = 64
+        # === Tham số cho Tuning (truyền vào các hàm model) ===
+        N_ITER_SEARCH_SKLEARN = 15 # Số lần thử cho RF, XGB, SVM (tăng lên nếu có thời gian)
+        CV_FOLDS_TUNING_SKLEARN = 3 # Số fold CV cho tuning RF, XGB, SVM
+
+        # --- Tham số Keras (có thể tạo dict để truyền) ---
+        N_TIMESTEPS = 10
+        KERAS_EPOCHS = 30 # Tăng epochs, dùng EarlyStopping
+        KERAS_BATCH_SIZE = 64 # Thử 32, 64
+        KERAS_DROPOUT_RATE = 0.2 # Rate chung, có thể tùy chỉnh riêng
+        KERAS_LEARNING_RATE = 1e-4
+
+        # LSTM params (ví dụ 1 bộ)
+        lstm_params_set = {'lstm_units': 64, 'dropout_rate': 0.3, 'learning_rate': KERAS_LEARNING_RATE, 'epochs': KERAS_EPOCHS, 'batch_size': KERAS_BATCH_SIZE}
+        # Transformer params (ví dụ 1 bộ)
+        transformer_params_set = {
+            'num_transformer_blocks': 2, 'head_size': 64, 'num_heads': 2,
+            'ff_dim': 64, 'dropout_rate': 0.25, 'learning_rate': KERAS_LEARNING_RATE,
+            'epochs': KERAS_EPOCHS, 'batch_size': KERAS_BATCH_SIZE
+        }
+        # ====================================================
 
         cv_splitter = create_time_series_cv_splits(df=df_with_indicators, date_col='date', ticker_col='ticker', initial_train_period=initial_train_td, test_period=test_td, step_period=step_td, expanding=USE_EXPANDING_WINDOW)
         all_split_results = {} # Lưu kết quả tất cả splits
@@ -252,53 +270,55 @@ def run_all_experiments():
                 results_this_split.update({"GARCH_Accuracy": np.nan, "GARCH_F1_Macro": np.nan, "GARCH_F1_Weighted": np.nan,
                                            "GARCH_Precision_Macro": np.nan, "GARCH_Recall_Macro": np.nan})
 
-                # RandomForest
+                # RandomForest (after tuning v0.1)
                 rf_results = rf_model.run_rf_evaluation(
-                    X_train_scaled=prep_data['X_train_scaled'], y_train=prep_data['y_train_ml'],
-                    X_test_scaled=prep_data['X_test_scaled'], y_test=prep_data['y_test_ml'])
+                    prep_data['X_train_scaled'], prep_data['y_train_ml'],
+                    prep_data['X_test_scaled'], prep_data['y_test_ml'],
+                    n_iter_search=N_ITER_SEARCH_SKLEARN,
+                    cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN
+                )
                 results_this_split.update(rf_results)
 
-                # ===== GỌI XGBOOST =====
+                # ===== GỌI XGBOOST (after tuning v0.1)=====
                 if XGB_INSTALLED:
                      xgb_results = xgboost_model.run_xgboost_evaluation(
-                         X_train_scaled=prep_data['X_train_scaled'], y_train=prep_data['y_train_ml'],
-                         X_test_scaled=prep_data['X_test_scaled'], y_test=prep_data['y_test_ml'])
+                         prep_data['X_train_scaled'], prep_data['y_train_ml'],
+                         prep_data['X_test_scaled'], prep_data['y_test_ml'],
+                         n_iter_search=N_ITER_SEARCH_SKLEARN,
+                         cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN
+                     )
                      results_this_split.update(xgb_results)
-                else:
-                     # Cập nhật NaN nếu XGBoost không được cài đặt
-                     results_this_split.update({"XGBoost_Accuracy": np.nan, "XGBoost_F1_Macro": np.nan, "XGBoost_F1_Weighted": np.nan,
-                                                "XGBoost_Precision_Macro": np.nan, "XGBoost_Recall_Macro": np.nan})
                 # =======================
 
-                # --- SVM (SVC) ---
-                if SKLEARN_INSTALLED: # Hoặc dựa vào svm_model.SKLEARN_AVAILABLE nếu có
+                # --- SVM (SVC) (after tuning v0.1) ---
+                if SKLEARN_INSTALLED:
                     svm_results = svm_model.run_svm_evaluation(
-                        X_train_scaled=prep_data['X_train_scaled'], y_train=prep_data['y_train_ml'],
-                        X_test_scaled=prep_data['X_test_scaled'], y_test=prep_data['y_test_ml'],
-                        # Có thể truyền thêm tham số SVM tại đây, ví dụ: C=0.5, kernel='linear'
+                        prep_data['X_train_scaled'], prep_data['y_train_ml'],
+                        prep_data['X_test_scaled'], prep_data['y_test_ml'],
+                        n_iter_search=N_ITER_SEARCH_SKLEARN,
+                        cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN
                     )
                     results_this_split.update(svm_results)
                 else:
                     results_this_split.update({"SVM_Accuracy": np.nan, "SVM_F1_Macro": np.nan, "SVM_F1_Weighted": np.nan,
                                                "SVM_Precision_Macro": np.nan, "SVM_Recall_Macro": np.nan})
 
-                # LSTM
+                # LSTM (truyền tham số)
                 lstm_results = lstm_model.run_lstm_evaluation(
-                    X_train_seq=prep_data['X_train_seq'], y_train_seq=prep_data['y_train_seq'],
-                    X_test_seq=prep_data['X_test_seq'], y_test_original_trend=prep_data['y_test_seq_original_trend'],
-                    class_weight_dict=prep_data['class_weight_dict'], n_classes=prep_data['n_classes'],
-                    n_timesteps=N_TIMESTEPS, n_features=len(FEATURE_COLS), lstm_units=LSTM_UNITS,
-                    dropout_rate=DROPOUT_RATE, epochs=EPOCHS, batch_size=BATCH_SIZE)
+                    prep_data['X_train_seq'], prep_data['y_train_seq'], prep_data['X_test_seq'],
+                    prep_data['y_test_seq_original_trend'], prep_data['class_weight_dict'], prep_data['n_classes'],
+                    N_TIMESTEPS, len(FEATURE_COLS),
+                    **lstm_params_set # Truyền dict tham số
+                )
                 results_this_split.update(lstm_results)
 
-                # Transformer
+                # Transformer (truyền tham số)
                 transformer_results = transformer_model.run_transformer_evaluation(
-                    X_train_seq=prep_data['X_train_seq'], y_train_seq=prep_data['y_train_seq'],
-                    X_test_seq=prep_data['X_test_seq'], y_test_original_trend=prep_data['y_test_seq_original_trend'],
-                    class_weight_dict=prep_data['class_weight_dict'], n_classes=prep_data['n_classes'],
-                    n_timesteps=N_TIMESTEPS, n_features=len(FEATURE_COLS), head_size=TRANSFORMER_HEAD_SIZE,
-                    num_heads=TRANSFORMER_NUM_HEADS, ff_dim=TRANSFORMER_FF_DIM, dropout_rate=DROPOUT_RATE,
-                    epochs=EPOCHS, batch_size=BATCH_SIZE)
+                    prep_data['X_train_seq'], prep_data['y_train_seq'], prep_data['X_test_seq'],
+                    prep_data['y_test_seq_original_trend'], prep_data['class_weight_dict'], prep_data['n_classes'],
+                    N_TIMESTEPS, len(FEATURE_COLS),
+                    **transformer_params_set # Truyền dict tham số
+                )
                 results_this_split.update(transformer_results)
 
             else:
@@ -326,9 +346,14 @@ def run_all_experiments():
 
             if not final_results_df.empty:
                 print("\n--- Performance Summary (Mean +/- Std Dev) ---")
-                summary = final_results_df.agg(['mean', 'std']).T
-                # summary_valid chỉ lấy các hàng (metrics) mà giá trị 'mean' không phải là NaN
-                summary_valid = summary.dropna(subset=['mean']).copy() # Thêm .copy()
+                numeric_metric_cols = [col for col in final_results_df.columns
+                    if "Accuracy" in col or "F1" in col or "Precision" in col or "Recall" in col]
+            if not numeric_metric_cols:
+                print("No numeric metric columns found in results to aggregate.")
+                summary_valid = pd.DataFrame() # Khởi tạo rỗng nếu không có cột số
+            else:
+                summary = final_results_df[numeric_metric_cols].agg(['mean', 'std']).T
+                summary_valid = summary.dropna(subset=['mean']).copy()
 
                 if not summary_valid.empty:
                     summary_valid_for_display = summary_valid.copy() # Tạo bản sao để thêm cột hiển thị
@@ -369,8 +394,6 @@ def run_all_experiments():
                     print(f"Error saving results to CSV: {e}")
                 # =================================================
 
-            else: # final_results_df rỗng sau khi drop cột toàn NaN
-                print("No results to aggregate after dropping all-NaN columns from final_results_df.")
         else: # all_split_results rỗng
             print("No results from any split to aggregate.")
 

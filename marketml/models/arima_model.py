@@ -42,7 +42,6 @@ def run_arima_evaluation(train_df, test_df, target_col_trend, trend_threshold):
         return results_this_split
 
     for ticker in train_df['ticker'].unique():
-        # print(f"  Processing ARIMA for ticker: {ticker}") # Tắt bớt
         train_ticker_df = train_df[train_df['ticker'] == ticker]
         test_ticker_df = test_df[test_df['ticker'] == ticker]
 

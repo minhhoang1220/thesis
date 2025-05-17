@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 try:
     import xgboost as xgb
+    from sklearn.model_selection import RandomizedSearchCV
+    from scipy.stats import randint, uniform
     XGB_AVAILABLE = True
 except ImportError:
     XGB_AVAILABLE = False
@@ -18,7 +20,7 @@ except ModuleNotFoundError:
         print("Error: Cannot import metrics module in xgboost_model.py")
         metrics = None
 
-def run_xgboost_evaluation(X_train_scaled, y_train, X_test_scaled, y_test, **kwargs):
+def run_xgboost_evaluation(X_train_scaled, y_train, X_test_scaled, y_test, n_iter_search=20, cv_folds_tuning=3, **kwargs):
     """
     Huấn luyện, dự đoán và đánh giá mô hình XGBoost Classifier.
 
@@ -32,13 +34,13 @@ def run_xgboost_evaluation(X_train_scaled, y_train, X_test_scaled, y_test, **kwa
     Returns:
         dict: Dictionary chứa kết quả metrics của XGBoost.
     """
-    print("\n--- Training and Evaluating XGBoost Model ---")
+    print("\n--- Training and Evaluating XGBoost Model (with Tuning) ---")
     results = {}
     default_metrics = {"XGBoost_Accuracy": np.nan, "XGBoost_F1_Macro": np.nan, "XGBoost_F1_Weighted": np.nan,
                        "XGBoost_Precision_Macro": np.nan, "XGBoost_Recall_Macro": np.nan}
     results.update(default_metrics) # Khởi tạo
 
-    if not XGB_AVAILABLE:
+    if not XGB_AVAILABLE or RandomizedSearchCV is None or randint is None:
         print("Error: xgboost not installed. Cannot run XGBoost.")
         return results
     if metrics is None:
@@ -46,51 +48,61 @@ def run_xgboost_evaluation(X_train_scaled, y_train, X_test_scaled, y_test, **kwa
         return results
 
     try:
-        # XGBoost yêu cầu nhãn lớp phải là số nguyên không âm (0, 1, 2, ...)
-        # Chuyển đổi nhãn train từ (-1, 0, 1) thành (0, 1, 2)
-        y_train_xgb = y_train + 1
-        # y_test không cần chuyển đổi ở đây, chỉ dùng để so sánh cuối cùng
+        y_train_xgb = y_train + 1 # Chuyển về 0, 1, 2 cho XGBoost
 
-        print("  Training XGBoost...")
-        # Lấy tham số từ kwargs hoặc dùng giá trị mặc định
-        n_estimators = kwargs.get('n_estimators', 100)
-        max_depth = kwargs.get('max_depth', 6) # Thường sâu hơn RF một chút
-        learning_rate = kwargs.get('learning_rate', 0.1)
+        print(f"  Performing RandomizedSearchCV for XGBoost (n_iter={n_iter_search}, cv={cv_folds_tuning})...")
 
-        # objective='multi:softmax' cho phân loại đa lớp
-        # num_class=3 vì có 3 lớp (0, 1, 2 sau khi chuyển đổi)
-        # use_label_encoder=False để tránh warning
-        xgb_model = xgb.XGBClassifier(
+        # Chiến lược tuning của bạn:
+        # learning_rate: Giảm nhẹ (0.01 - 0.1)
+        # max_depth: Test giá trị nhỏ hơn (3-6)
+        # subsample, colsample_bytree: [0.5, 0.9]
+        # n_estimators: Giữ ổn định, nhưng tăng nhẹ nếu giảm learning_rate.
+        # (Chúng ta sẽ để n_estimators trong khoảng, RandomizedSearchCV sẽ tự tìm)
+        param_dist = {
+            'n_estimators': randint(100, 301), # Giữ ổn định hoặc tăng nhẹ
+            'learning_rate': uniform(0.01, 0.09), # Từ 0.01 đến 0.1 (0.01 + 0.09 = 0.1)
+            'max_depth': randint(3, 7),         # Từ 3 đến 6
+            'subsample': uniform(0.5, 0.4),     # Từ 0.5 đến 0.9 (0.5 + 0.4 = 0.9)
+            'colsample_bytree': uniform(0.5, 0.4),# Từ 0.5 đến 0.9
+            'gamma': uniform(0, 0.5) # Thêm gamma để kiểm soát phức tạp
+            # 'min_child_weight': randint(1, 6) # Có thể thêm
+        }
+
+        base_xgb = xgb.XGBClassifier(
             objective='multi:softmax',
             num_class=3,
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            learning_rate=learning_rate,
-            use_label_encoder=False, # Quan trọng
-            eval_metric='mlogloss',   # Metric đánh giá nội bộ (nếu dùng early stopping)
+            use_label_encoder=False,
+            eval_metric='mlogloss',
             random_state=42,
             n_jobs=-1
-            # Lưu ý: XGBoost không có 'class_weight' trực tiếp như RF.
-            # Xử lý mất cân bằng phức tạp hơn, có thể dùng tham số 'scale_pos_weight'
-            # cho từng lớp hoặc dùng 'sample_weight' trong fit. Tạm thời bỏ qua.
         )
 
-        # Huấn luyện với nhãn đã chuyển đổi (0, 1, 2)
-        xgb_model.fit(X_train_scaled, y_train_xgb)
+        xgb_search = RandomizedSearchCV(
+            estimator=base_xgb,
+            param_distributions=param_dist,
+            n_iter=n_iter_search,
+            cv=cv_folds_tuning,
+            verbose=0,
+            random_state=42,
+            n_jobs=-1,
+            scoring='f1_macro'
+        )
 
-        print("  Predicting with XGBoost...")
-        # Dự đoán cũng sẽ ra nhãn (0, 1, 2)
-        xgb_preds_xgb = xgb_model.predict(X_test_scaled)
+        xgb_search.fit(X_train_scaled, y_train_xgb)
 
-        # Chuyển đổi dự đoán về lại thang đo gốc (-1, 0, 1) để đánh giá
-        xgb_preds_trend = xgb_preds_xgb - 1
+        print(f"  Best XGBoost params found: {xgb_search.best_params_}")
+        best_xgb_model = xgb_search.best_estimator_
 
-        # Đánh giá với nhãn test gốc (-1, 0, 1)
+        print("  Predicting with best XGBoost...")
+        xgb_preds_xgb = best_xgb_model.predict(X_test_scaled)
+        xgb_preds_trend = xgb_preds_xgb - 1 # Về lại -1, 0, 1
+
         xgb_metrics = metrics.calculate_classification_metrics(y_test, xgb_preds_trend, model_name="XGBoost")
-        results.update(xgb_metrics) # Ghi đè NaN
+        results.update(xgb_metrics)
+        results["XGBoost_BestParams"] = str(xgb_search.best_params_)
 
     except Exception as e:
          print(f"Error during XGBoost execution: {e}")
-         # Giữ nguyên kết quả NaN đã khởi tạo
+         # Giữ nguyên kết quả NaN
 
     return results

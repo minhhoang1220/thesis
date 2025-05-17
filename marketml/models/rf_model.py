@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 try:
     from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import RandomizedSearchCV
+    from scipy.stats import randint, uniform 
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -18,7 +20,7 @@ except ModuleNotFoundError:
         print("Error: Cannot import metrics module in rf_model.py")
         metrics = None
 
-def run_rf_evaluation(X_train_scaled, y_train, X_test_scaled, y_test, **kwargs):
+def run_rf_evaluation(X_train_scaled, y_train, X_test_scaled, y_test, n_iter_search=20, cv_folds_tuning=3, **kwargs):
     """
     Huấn luyện, dự đoán và đánh giá mô hình RandomForest.
 
@@ -32,13 +34,13 @@ def run_rf_evaluation(X_train_scaled, y_train, X_test_scaled, y_test, **kwargs):
     Returns:
         dict: Dictionary chứa kết quả metrics của RandomForest.
     """
-    print("\n--- Training and Evaluating RandomForest Model ---")
+    print("\n--- Training and Evaluating RandomForest Model (with Tuning) ---")
     results = {}
     default_metrics = {"RandomForest_Accuracy": np.nan, "RandomForest_F1_Macro": np.nan, "RandomForest_F1_Weighted": np.nan,
                        "RandomForest_Precision_Macro": np.nan, "RandomForest_Recall_Macro": np.nan}
     results.update(default_metrics) # Khởi tạo
 
-    if not SKLEARN_AVAILABLE:
+    if not SKLEARN_AVAILABLE or RandomizedSearchCV is None or randint is None:
         print("Error: scikit-learn not installed. Cannot run RandomForest.")
         return results
     if metrics is None:
@@ -46,31 +48,48 @@ def run_rf_evaluation(X_train_scaled, y_train, X_test_scaled, y_test, **kwargs):
         return results
 
     try:
-        print("  Training RandomForest...")
-        # Lấy tham số từ kwargs hoặc dùng giá trị mặc định tốt
-        n_estimators = kwargs.get('n_estimators', 100)
-        max_depth = kwargs.get('max_depth', 10)
-        min_samples_leaf = kwargs.get('min_samples_leaf', 5)
+        print(f"  Performing RandomizedSearchCV for RandomForest (n_iter={n_iter_search}, cv={cv_folds_tuning})...")
 
-        rf_model = RandomForestClassifier(
-            n_estimators=n_estimators,
+        # Chiến lược tuning của bạn:
+        # max_depth: Giới hạn chiều sâu (10–30) để giảm overfitting.
+        # min_samples_split, min_samples_leaf: Tăng nhẹ để giảm biến động giữa folds.
+        # n_estimators: Tăng số cây lên 300–500 để tăng tính ổn định.
+        param_dist = {
+            'n_estimators': randint(300, 501), # Từ 300 đến 500
+            'max_depth': randint(10, 31),    # Từ 10 đến 30
+            'min_samples_split': randint(5, 21), # Tăng nhẹ, ví dụ từ 5 đến 20
+            'min_samples_leaf': randint(3, 16),  # Tăng nhẹ, ví dụ từ 3 đến 15
+            'bootstrap': [True, False],
+            'criterion': ['gini', 'entropy']
+        }
+
+        base_rf = RandomForestClassifier(random_state=42, class_weight='balanced', n_jobs=-1)
+
+        rf_search = RandomizedSearchCV(
+            estimator=base_rf,
+            param_distributions=param_dist,
+            n_iter=n_iter_search,
+            cv=cv_folds_tuning,
+            verbose=0, # Đặt 1 hoặc 2 để xem chi tiết
             random_state=42,
             n_jobs=-1,
-            class_weight='balanced',
-            max_depth=max_depth,
-            min_samples_leaf=min_samples_leaf
+            scoring='f1_macro' # Ưu tiên F1 Macro
         )
-        rf_model.fit(X_train_scaled, y_train) # Hoạt động với cả array và df
 
-        print("  Predicting with RandomForest...")
-        rf_preds = rf_model.predict(X_test_scaled)
+        rf_search.fit(X_train_scaled, y_train)
 
-        # Đánh giá
+        print(f"  Best RandomForest params found: {rf_search.best_params_}")
+        best_rf_model = rf_search.best_estimator_
+
+        print("  Predicting with best RandomForest...")
+        rf_preds = best_rf_model.predict(X_test_scaled)
+
         rf_metrics = metrics.calculate_classification_metrics(y_test, rf_preds, model_name="RandomForest")
-        results.update(rf_metrics) # Ghi đè NaN
+        results.update(rf_metrics)
+        results["RandomForest_BestParams"] = str(rf_search.best_params_)
 
     except Exception as e:
          print(f"Error during RandomForest execution: {e}")
-         # Giữ nguyên kết quả NaN đã khởi tạo
+         # Giữ nguyên kết quả NaN
 
     return results
