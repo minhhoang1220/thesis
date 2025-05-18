@@ -79,19 +79,6 @@ def run_lstm_evaluation(X_train_seq, y_train_seq, X_test_seq, y_test_original_tr
             verbose=0
         )
 
-        # Callbacks
-        early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=0)
-        reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=1e-6, verbose=0)
-
-        print(f"    Training LSTM for up to {epochs} epochs with EarlyStopping...")
-        history_lstm = lstm_model.fit(
-            X_train_seq, y_train_seq, epochs=epochs, batch_size=batch_size,
-            class_weight=class_weight_dict, validation_split=0.1, shuffle=True,
-            callbacks=[early_stopping, reduce_lr], verbose=0 # Thêm callbacks
-        )
-        print(f"    Training finished after {len(history_lstm.history['loss'])} epochs.")
-
-
         print("    Predicting with LSTM...")
         lstm_pred_probs = lstm_model.predict(X_test_seq)
         lstm_pred_keras = np.argmax(lstm_pred_probs, axis=1)

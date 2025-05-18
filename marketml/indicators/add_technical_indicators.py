@@ -19,9 +19,12 @@ def add_technical_indicators(
     Thêm các chỉ báo kỹ thuật và features mới vào DataFrame.
     """
     if ta_indicators is None: # ... (như cũ)
+        raise ImportError("ta_indicators module is not available.")
     df_out = df.copy()
     if price_col not in df_out.columns: # ... (như cũ)
+        raise ValueError(f"Price column '{price_col}' not found in DataFrame.")
     if not pd.api.types.is_numeric_dtype(df_out[price_col]): # ... (như cũ)
+        raise TypeError(f"Price column '{price_col}' must be numeric.")
 
     if indicators_to_add is None:
         indicators_to_add = ['rsi', 'macd', 'bollinger', 'sma', 'ema', 'obv', 'rolling_close', 'rolling_rsi', 'price_zscore'] # Thêm chỉ báo mới
