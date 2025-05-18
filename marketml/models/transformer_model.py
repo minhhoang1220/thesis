@@ -52,18 +52,20 @@ def run_transformer_evaluation(X_train_seq, y_train_seq, X_test_seq, y_test_orig
     try:
         keras.backend.clear_session()
 
-        # Lấy tham số tuning từ kwargs
-        num_transformer_blocks = kwargs.get('num_transformer_blocks', 2) # Thử 2-3
-        head_size = kwargs.get('head_size', 64) # Thử 64, 128
-        num_heads = kwargs.get('num_heads', 2)   # Thử 2, 4
-        ff_dim = kwargs.get('ff_dim', 64)       # Thử 64, 128
-        dropout_rate = kwargs.get('dropout_rate', 0.25) # Tăng lên
-        learning_rate = kwargs.get('learning_rate', 1e-4) # AdamW + scheduler
+        # Lấy tham số tuning từ kwargs hoặc dùng giá trị mặc định
+        num_transformer_blocks = kwargs.get('num_transformer_blocks', 2)
+        head_size = kwargs.get('head_size', 64)
+        num_heads = kwargs.get('num_heads', 2)
+        ff_dim = kwargs.get('ff_dim', 64)
+        dropout_rate = kwargs.get('dropout_rate', 0.25)
+        learning_rate = kwargs.get('learning_rate', 1e-4)
         epochs = kwargs.get('epochs', 50)
         batch_size = kwargs.get('batch_size', 64)
+        weight_decay = kwargs.get('weight_decay', 1e-4) # Lấy từ kwargs
+        validation_split = kwargs.get('validation_split', 0.1) # Lấy từ kwargs
+        early_stopping_patience = kwargs.get('early_stopping_patience', 10) # Lấy từ kwargs
 
-        print(f"  Training Transformer with params: blocks={num_transformer_blocks}, head_size={head_size}, num_heads={num_heads}, ff_dim={ff_dim}, dropout={dropout_rate}, lr={learning_rate}, epochs={epochs}, batch_size={batch_size}")
-
+        print(f"  Training Transformer with params: blocks={num_transformer_blocks}, head_size={head_size}, num_heads={num_heads}, ff_dim={ff_dim}, dropout={dropout_rate}, lr={learning_rate}, epochs={epochs}, batch_size={batch_size}, wd={weight_decay}")
 
         input_shape = (n_timesteps, n_features)
         inputs = Input(shape=input_shape)
@@ -77,21 +79,35 @@ def run_transformer_evaluation(X_train_seq, y_train_seq, X_test_seq, y_test_orig
         transformer_model = Model(inputs, outputs)
 
         # Optimizer và Scheduler
-        if _CosineDecay is not None: # Kiểm tra biến đã import
-            decay_steps = epochs * (X_train_seq.shape[0] // batch_size + 1)
-            lr_schedule = _CosineDecay(initial_learning_rate=learning_rate, decay_steps=decay_steps, alpha=0.0)
-            optimizer = _AdamW(learning_rate=lr_schedule, weight_decay=1e-4) # Sử dụng _AdamW đã import/fallback
+        optimizer_choice = _AdamW # Sử dụng biến đã import/fallback
+        if _CosineDecay is not None:
+            num_train_steps_per_epoch = X_train_seq.shape[0] // batch_size
+            if X_train_seq.shape[0] % batch_size != 0:
+                num_train_steps_per_epoch += 1 # Account for the last batch
+            decay_steps = epochs * num_train_steps_per_epoch
+            
+            lr_schedule = _CosineDecay(
+                initial_learning_rate=learning_rate, 
+                decay_steps=decay_steps, 
+                alpha=0.0 # End at 0 learning rate
+            )
+            optimizer = optimizer_choice(learning_rate=lr_schedule, weight_decay=weight_decay)
         else:
-            optimizer = _AdamW(learning_rate=learning_rate, weight_decay=1e-4) # Sử dụng _AdamW đã import/fallback
+            optimizer = optimizer_choice(learning_rate=learning_rate, weight_decay=weight_decay)
 
         transformer_model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer, metrics=["accuracy"])
-        early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=0)
+        
+        callbacks_list = []
+        callbacks_list.append(EarlyStopping(monitor='val_loss', patience=early_stopping_patience, restore_best_weights=True, verbose=0))
+        # Transformer thường không dùng ReduceLROnPlateau khi đã có CosineDecay, nhưng bạn có thể thêm nếu muốn
 
         print(f"    Training Transformer for up to {epochs} epochs with EarlyStopping...")
         history_transformer = transformer_model.fit(
             X_train_seq, y_train_seq, epochs=epochs, batch_size=batch_size,
-            class_weight=class_weight_dict, validation_split=0.1, shuffle=True,
-            callbacks=[early_stopping], verbose=0
+            class_weight=class_weight_dict, validation_split=validation_split, # Sử dụng validation_split
+            shuffle=True,
+            callbacks=callbacks_list, # Sử dụng list callbacks
+            verbose=0
         )
         epochs_run = len(history_transformer.history['loss'])
         print(f"    Training finished after {epochs_run} epochs.")

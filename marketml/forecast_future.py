@@ -5,12 +5,28 @@ from pathlib import Path
 import warnings
 import pmdarima as pm
 from statsmodels.tsa.stattools import adfuller
+from pathlib import Path
+import sys
+
+# Thêm thư mục gốc vào sys.path
+project_root_cli_fc = Path(__file__).resolve().parents[1] # .ndmh/
+sys.path.insert(0, str(project_root_cli_fc))
+
+try:
+    from marketml.configs import configs # <--- IMPORT CONFIGS
+except ImportError:
+    print("Error: Could not import configs.py. Make sure it's in marketml/configs/ and __init__.py exists.")
+    exit()
 
 # ----- Cấu hình -----
-FORECAST_YEAR = 2025
-TRAINING_YEARS = 3
-TREND_THRESHOLD = 0.002
-APPROX_TRADING_DAYS_PER_YEAR = 252
+FORECAST_YEAR = configs.FORECAST_YEAR_TARGET
+TRAINING_YEARS = configs.FORECAST_TRAINING_YEARS
+TREND_THRESHOLD = configs.FORECAST_TREND_THRESHOLD
+APPROX_TRADING_DAYS_PER_YEAR = configs.APPROX_TRADING_DAYS_PER_YEAR
+# Đường dẫn đến file enriched data đã được tạo bởi create_enriched_data.py
+ENRICHED_DATA_FILE_FOR_FORECAST = configs.ENRICHED_DATA_FOR_FORECAST # Hoặc configs.ENRICHED_DATA_FILE
+# Đường dẫn output cho forecast
+FORECAST_OUTPUT_DIR = configs.FORECASTS_DIR
 # --------------------
 
 # ===== BỎ QUA WARNINGS =====
@@ -22,25 +38,13 @@ def generate_future_forecast(forecast_year=FORECAST_YEAR, training_years=TRAININ
     print(f"--- Generating Forecast for Year {forecast_year} using last {training_years} years of data ---")
 
     # --- Bước 1: Load Dữ liệu ĐÃ LÀM GIÀU ---
-    # *** SỬA Ở ĐÂY: Xác định đúng thư mục chứa script này (marketml) ***
-    current_script_dir = Path(__file__).resolve().parent
-    # => current_script_dir sẽ là .../.ndmh/marketml/
-
-    # Đường dẫn bây giờ sẽ đúng
-    ENRICHED_DATA_DIR = current_script_dir / "data" / "processed"
-    ENRICHED_DATA_FILE = ENRICHED_DATA_DIR / "price_data_with_indicators.csv"
-    # => ENRICHED_DATA_FILE sẽ là .../.ndmh/marketml/data/processed/price_data_with_indicators.csv
-
-    # Thêm debug để chắc chắn
-    print(f"DEBUG: Attempting to load from: {ENRICHED_DATA_FILE.resolve()}")
-
+    print(f"DEBUG: Attempting to load from: {ENRICHED_DATA_FILE_FOR_FORECAST.resolve()}")
     try:
-        # print(f"Loading enriched data from: {ENRICHED_DATA_FILE}") # Đã có debug ở trên
-        df_hist = pd.read_csv(ENRICHED_DATA_FILE, parse_dates=['date'])
+        df_hist = pd.read_csv(ENRICHED_DATA_FILE_FOR_FORECAST, parse_dates=['date'])
         print("Enriched data loaded successfully.")
     except FileNotFoundError:
-        print(f"Error: Enriched data file not found at '{ENRICHED_DATA_FILE.resolve()}'.")
-        print("Ensure 'marketml/indicators/create_enriched_data.py' ran successfully and saved the file to the correct location.")
+        print(f"Error: Enriched data file not found at '{ENRICHED_DATA_FILE_FOR_FORECAST.resolve()}'.")
+        print(f"Ensure '{configs.ENRICHED_DATA_FILE.name}' was created by 'create_enriched_data.py'.") # Thông báo file chính
         return None
     except Exception as e:
         print(f"Error loading enriched data: {e}"); return None
@@ -87,12 +91,10 @@ def generate_future_forecast(forecast_year=FORECAST_YEAR, training_years=TRAININ
     final_forecast_df = pd.concat(all_forecasts, ignore_index=True)
     print(f"\nForecast generated successfully for {len(unique_tickers)} tickers.")
     try:
-        # *** Sửa ở đây: Xác định output_dir dựa trên current_script_dir ***
-        output_dir = current_script_dir.parent / "forecasts" # Lưu vào thư mục forecasts ngang hàng với marketml
-        output_dir.mkdir(parents=True, exist_ok=True)
-        forecast_file = output_dir / f"arima_forecast_{forecast_year}.csv"
+        FORECAST_OUTPUT_DIR.mkdir(parents=True, exist_ok=True) # Sử dụng biến từ configs
+        forecast_file = FORECAST_OUTPUT_DIR / f"arima_forecast_{forecast_year}.csv"
         final_forecast_df.to_csv(forecast_file, index=False)
-        print(f"Forecast saved to: {forecast_file.resolve()}") # In đường dẫn tuyệt đối
+        print(f"Forecast saved to: {forecast_file.resolve()}")
     except Exception as e: print(f"Error saving forecast file: {e}")
     print("\nSample Forecast (last 10 rows overall):")
     print(final_forecast_df.tail(10).to_string())

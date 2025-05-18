@@ -2,13 +2,26 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
+import sys
 
-# --- Cấu hình Đường dẫn ---
-# Giả định script này nằm ở thư mục gốc dự án
-project_root_from_cwd = Path.cwd()
-RESULTS_DIR = project_root_from_cwd / "marketml" / "results" # Thư mục results nằm ở gốc
-SUMMARY_FILE = RESULTS_DIR / "model_performance_summary.csv"
-DETAILED_FILE = RESULTS_DIR / "model_performance_detailed.csv"
+project_root_analyzer = Path(__file__).resolve().parent # .ndmh/
+sys.path.insert(0, str(project_root_analyzer))
+
+try:
+    from marketml.configs import configs # <--- IMPORT CONFIGS
+except ImportError:
+    print("Error: Could not import configs.py for analyzer.")
+    configs = None # Fallback nếu không import được, các đường dẫn sẽ lỗi
+
+# --- Cấu hình Đường dẫn từ configs ---
+if configs:
+    RESULTS_DIR = configs.RESULTS_DIR
+    SUMMARY_FILE = RESULTS_DIR / "model_performance_summary.csv"
+    DETAILED_FILE = RESULTS_DIR / "model_performance_detailed.csv"
+else: # Fallback nếu configs không load được (để script không crash ngay)
+    RESULTS_DIR = project_root_analyzer / "results"
+    SUMMARY_FILE = RESULTS_DIR / "model_performance_summary.csv"
+    DETAILED_FILE = RESULTS_DIR / "model_performance_detailed.csv"
 
 # --- Các metrics chính cần trực quan hóa ---
 # Lấy từ tên cột trong file summary (ví dụ: ARIMA_Accuracy, RandomForest_F1_Macro)

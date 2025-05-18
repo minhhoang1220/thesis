@@ -12,6 +12,7 @@ sys.path.insert(0, str(project_root))
 try:
     from marketml.data.loader import price_loader
     from marketml.data.loader import preprocess
+    from marketml.configs import configs
 except ImportError as e:
     print(f"Error importing marketml modules: {e}"); exit()
 
@@ -26,12 +27,12 @@ except ImportError:
 # ==============================
 
 # Đường dẫn file output
-OUTPUT_DIR = project_root / "marketml" / "data" / "processed"
-OUTPUT_FILE = OUTPUT_DIR / "price_data_enriched_v2.csv"
+OUTPUT_DIR = configs.ENRICHED_DATA_DIR 
+OUTPUT_FILE = configs.ENRICHED_DATA_FILE #
 
 # --- Tham số cho GARCH feature ---
-GARCH_WINDOW = 252 # Fit GARCH trên 252 ngày (~1 năm) gần nhất
-GARCH_FORECAST_HORIZON = 1 # Dự báo biến động cho 1 ngày tới
+GARCH_WINDOW = configs.GARCH_WINDOW 
+GARCH_FORECAST_HORIZON = configs.GARCH_FORECAST_HORIZON 
 # ---------------------------------
 
 def calculate_garch_volatility_feature(series_returns: pd.Series, window: int, horizon: int):
@@ -99,47 +100,42 @@ def create_and_save_enriched_data():
         print(f"  Processing ticker: {ticker} ({len(group_df)} rows)")
         group_df_sorted = group_df.sort_values('date').copy()
 
-        # --- Bước 3a: Thêm GARCH Volatility Feature ---
         if ARCH_INSTALLED:
             print(f"    Calculating GARCH(1,1) volatility feature for {ticker} (window={GARCH_WINDOW})... This may take a while.")
-            # Tính daily returns (nhân 100 cho GARCH)
             daily_returns = group_df_sorted['close'].pct_change().dropna() * 100
-            # Tính GARCH volatility và shift 1 ngày để nó là feature của ngày hiện tại dự báo cho ngày mai
             garch_vol = calculate_garch_volatility_feature(daily_returns, GARCH_WINDOW, GARCH_FORECAST_HORIZON)
-            # Gán garch_vol vào group_df_sorted. Index của garch_vol là index của daily_returns.
-            # Chúng ta muốn garch_vol của ngày t-1 (dự báo cho ngày t) làm feature cho ngày t.
-            # Do đó, garch_vol được tính trên returns đến t-1, dự báo cho t.
-            # Shift(1) để giá trị dự báo cho ngày t được align với hàng dữ liệu của ngày t.
-            group_df_sorted['garch_vol_forecast'] = garch_vol.shift(1)
+            group_df_sorted['garch_vol_forecast'] = garch_vol.shift(1) # Shift(1) để là feature của ngày hiện tại
             print(f"    GARCH volatility feature calculated for {ticker}.")
         else:
-            group_df_sorted['garch_vol_forecast'] = np.nan # Cột NaN nếu Arch không được cài
+            group_df_sorted['garch_vol_forecast'] = np.nan
 
-
-        # --- Bước 3b: Thêm các chỉ báo kỹ thuật TA ---
-        # print(f"    Adding other TA indicators for {ticker}...") # Tắt bớt print
         group_with_ta = preprocess.add_technical_indicators(
-            group_df_sorted, # Dùng df đã có thể có cột garch_vol
+            group_df_sorted,
             price_col='close',
-            volume_col='volume'
+            volume_col='volume',
+            # Truyền các tham số TA từ configs
+            rsi_window=configs.RSI_WINDOW,
+            macd_fast=configs.MACD_FAST, macd_slow=configs.MACD_SLOW, macd_signal=configs.MACD_SIGNAL,
+            bb_window=configs.BB_WINDOW,
+            sma_window=configs.SMA_WINDOW, ema_window=configs.EMA_WINDOW,
+            rolling_stat_windows=configs.ROLLING_STAT_WINDOWS,
+            price_zscore_window=configs.PRICE_ZSCORE_WINDOW
         )
         all_enriched_df_list.append(group_with_ta)
         processed_tickers_count += 1
-
+    # ... (concat và save data, sử dụng OUTPUT_FILE, OUTPUT_DIR từ configs) ...
     if not all_enriched_df_list: print("\nWarning: No data to save."); return
     df_final_enriched = pd.concat(all_enriched_df_list, ignore_index=True)
     print(f"\nAll features (TA & GARCH) added successfully for {processed_tickers_count} tickers.")
 
-
-    # --- Bước 4: Lưu Dữ liệu đã làm giàu ---
     try:
         print(f"\nSaving enriched data to: {OUTPUT_FILE.resolve()}")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         df_final_enriched.to_csv(OUTPUT_FILE, index=False)
         print("Enriched data saved successfully.")
-        df_final_enriched.info()
-        # ... (print sample) ...
+        # df_final_enriched.info() # Bỏ comment nếu muốn xem info
     except Exception as e: print(f"\nError saving enriched data: {e}")
+
 
 if __name__ == "__main__":
     create_and_save_enriched_data()

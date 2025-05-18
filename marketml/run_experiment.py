@@ -21,15 +21,15 @@ try:
 except ImportError: pass
 # ============================
 
-# === Import các module đã tách ===
+# === Import các module đã tách và configs ===
 try:
     from marketml.utils import metrics
     from marketml.models import (arima_model, rf_model, lstm_model,
                                  transformer_model, keras_utils, xgboost_model, svm_model)
+    from marketml.configs import configs # <--- THÊM IMPORT CONFIGS
 except ModuleNotFoundError as e:
-    print(f"Error importing necessary modules: {e}")
-    print("Ensure the project structure is correct, __init__.py files exist,")
-    print("and the script is run from the project root directory (.ndmh) or using 'python -m ...'.")
+    print(f"Error importing necessary modules or configs: {e}")
+    # ... (thông báo lỗi giữ nguyên) ...
     exit()
 # ================================
 
@@ -188,9 +188,7 @@ def prepare_split_data(train_df_orig, test_df_orig, feature_cols, lag_periods,
 
 def run_all_experiments():
     # --- Bước 1: Load Dữ liệu ĐÃ LÀM GIÀU ---
-    project_root = Path(__file__).resolve().parent
-    ENRICHED_DATA_DIR = project_root / "data" / "processed"
-    ENRICHED_DATA_FILE = ENRICHED_DATA_DIR / "price_data_enriched_v2.csv"
+    ENRICHED_DATA_FILE = configs.ENRICHED_DATA_FILE
 
     try:
         print(f"Loading enriched data from: {ENRICHED_DATA_FILE}")
@@ -198,138 +196,146 @@ def run_all_experiments():
         print("Enriched data loaded successfully.")
     except FileNotFoundError: print(f"Error: Enriched data file not found at '{ENRICHED_DATA_FILE}'. Run 'marketml/indicators/create_enriched_data.py' first."); exit()
     except Exception as e: print(f"Error loading enriched data: {e}"); exit()
-
+    
     # --- Kiểm tra nhanh các cột ---
-    required_cols_final = ['date', 'ticker', 'close', 'RSI', 'MACD', 'garch_vol_forecast', 'OBV', 'close_roll_mean_5', 'RSI_roll_std_10', 'close_zscore_20']
-    missing_cols_final = [col for col in required_cols_final if col not in df_with_indicators.columns]
-    if missing_cols_final: print(f"\nError: Missing expected columns: {missing_cols_final}"); exit()
+    # (Sử dụng configs.BASE_FEATURE_COLS để kiểm tra một phần, hoặc tạo danh sách đầy đủ hơn)
+    # Ví dụ một cách kiểm tra đơn giản:
+    required_cols_check = ['date', 'ticker', 'close'] + configs.BASE_FEATURE_COLS[:3] # Kiểm tra vài cột cơ bản
+    missing_cols_final = [col for col in required_cols_check if col not in df_with_indicators.columns and col != 'garch_vol_forecast' or (col == 'garch_vol_forecast' and not ARCH_INSTALLED and col not in df_with_indicators.columns)]
+    if missing_cols_final: print(f"\nError: Missing some expected columns from enriched data: {missing_cols_final}"); # exit() # Có thể comment exit() để linh hoạt hơn
+
     if not pd.api.types.is_datetime64_any_dtype(df_with_indicators['date']): print("\nError: 'date' column is not datetime type."); exit()
 
-
-    # --- Bước 2: Chia Train-Test và Chạy Mô hình ---
     if not df_with_indicators.empty:
         print("\nStarting Cross-Validation Runs...")
-        # --- Định nghĩa tham số ---
-        INITIAL_TRAIN_YEARS = 1 # Đặt lại để có nhiều split hơn (ví dụ)
-        TEST_YEARS = 1; STEP_YEARS = 1; USE_EXPANDING_WINDOW = True # Thử Expanding
-        initial_train_td = pd.Timedelta(days=365 * INITIAL_TRAIN_YEARS); test_td = pd.Timedelta(days=365 * TEST_YEARS); step_td = pd.Timedelta(days=365 * STEP_YEARS)
-        TREND_THRESHOLD = 0.002; LAG_PERIODS = [1, 3, 5]
+        # --- Lấy tham số từ configs ---
+        initial_train_td = configs.INITIAL_TRAIN_TIMEDELTA
+        test_td = configs.TEST_TIMEDELTA
+        step_td = configs.STEP_TIMEDELTA
+        USE_EXPANDING_WINDOW = configs.USE_EXPANDING_WINDOW
+        TREND_THRESHOLD = configs.TREND_THRESHOLD
+        LAG_PERIODS = configs.LAG_PERIODS
 
-        FEATURE_COLS_BASE = [ 'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'BB_Upper', 'BB_Lower', 'EMA_20', 'volume', 'garch_vol_forecast', 'OBV', 
-                             'close_roll_mean_5', 'close_roll_std_5', 
-                             'close_roll_mean_10', 'close_roll_std_10',
-                             'RSI_roll_mean_5', 'RSI_roll_std_5',
-                             'RSI_roll_mean_10', 'RSI_roll_std_10',
-                             'close_zscore_20']
-        FEATURE_COLS = FEATURE_COLS_BASE + [f'pct_change_lag_{p}' for p in LAG_PERIODS]
-        # Đảm bảo không có cột trùng lặp
-        FEATURE_COLS = sorted(list(set(FEATURE_COLS)))
-        print(f"\nUsing the following {len(FEATURE_COLS)} features for ML models: {FEATURE_COLS}")
-        TARGET_COL_PCT = 'target_pct_change'; TARGET_COL_TREND = 'target_trend'
-        # === Tham số cho Tuning (truyền vào các hàm model) ===
-        N_ITER_SEARCH_SKLEARN = 30 # Số lần thử cho RF, XGB, SVM (tăng lên nếu có thời gian)
-        CV_FOLDS_TUNING_SKLEARN = 3 # Số fold CV cho tuning RF, XGB, SVM
+        FEATURE_COLS_BASE = configs.BASE_FEATURE_COLS
+        FEATURE_COLS = sorted(list(set(FEATURE_COLS_BASE + [f'pct_change_lag_{p}' for p in LAG_PERIODS])))
+        print(f"\nUsing {len(FEATURE_COLS)} features for ML models (base + lags): {FEATURE_COLS}")
 
-        # --- Tham số Keras (có thể tạo dict để truyền) ---
-        N_TIMESTEPS = 10
-        KERAS_EPOCHS = 50 # Tăng epochs, dùng EarlyStopping
-        KERAS_BATCH_SIZE = 64 # Thử 32, 64
-        KERAS_DROPOUT_RATE = 0.25 # Rate chung, có thể tùy chỉnh riêng
-        KERAS_LEARNING_RATE = 5e-5
+        TARGET_COL_PCT = configs.TARGET_COL_PCT
+        TARGET_COL_TREND = configs.TARGET_COL_TREND
+        
+        N_ITER_SEARCH_SKLEARN = configs.N_ITER_SEARCH_SKLEARN
+        CV_FOLDS_TUNING_SKLEARN = configs.CV_FOLDS_TUNING_SKLEARN
 
-        # LSTM params (ví dụ 1 bộ)
-        lstm_params_set = {'lstm_units': 128, 'dropout_rate': KERAS_DROPOUT_RATE, 'learning_rate': KERAS_LEARNING_RATE, 'epochs': KERAS_EPOCHS, 'batch_size': KERAS_BATCH_SIZE}
-        # Transformer params (ví dụ 1 bộ)
+        N_TIMESTEPS = configs.N_TIMESTEPS_SEQUENCE
+        
+        # Keras params
+        lstm_params_set = {
+            'lstm_units': configs.LSTM_UNITS, 
+            'dropout_rate': configs.LSTM_DROPOUT_RATE, 
+            'learning_rate': configs.LSTM_LEARNING_RATE, 
+            'epochs': configs.KERAS_EPOCHS, 
+            'batch_size': configs.KERAS_BATCH_SIZE,
+            # Thêm các tham số callback vào đây nếu các hàm model nhận chúng
+            'validation_split': configs.KERAS_VALIDATION_SPLIT,
+            'early_stopping_patience': configs.KERAS_EARLY_STOPPING_PATIENCE,
+            'reduce_lr_patience': configs.KERAS_REDUCE_LR_PATIENCE,
+            'reduce_lr_factor': configs.KERAS_REDUCE_LR_FACTOR,
+            'min_lr': configs.KERAS_MIN_LR
+        }
         transformer_params_set = {
-            'num_transformer_blocks': 2, 'head_size': 128, 'num_heads': 4, # Tăng head_size, num_heads
-            'ff_dim': 128, 'dropout_rate': KERAS_DROPOUT_RATE + 0.1, # Tăng dropout cho Transformer
-            'learning_rate': KERAS_LEARNING_RATE,
-            'epochs': KERAS_EPOCHS, 'batch_size': KERAS_BATCH_SIZE
+            'num_transformer_blocks': configs.TRANSFORMER_NUM_BLOCKS, 
+            'head_size': configs.TRANSFORMER_HEAD_SIZE, 
+            'num_heads': configs.TRANSFORMER_NUM_HEADS,
+            'ff_dim': configs.TRANSFORMER_FF_DIM, 
+            'dropout_rate': configs.TRANSFORMER_DROPOUT_RATE,
+            'learning_rate': configs.TRANSFORMER_LEARNING_RATE,
+            'epochs': configs.KERAS_EPOCHS, 
+            'batch_size': configs.KERAS_BATCH_SIZE,
+            'weight_decay': configs.TRANSFORMER_WEIGHT_DECAY,
+            # Thêm các tham số callback
+            'validation_split': configs.KERAS_VALIDATION_SPLIT,
+            'early_stopping_patience': configs.KERAS_EARLY_STOPPING_PATIENCE
         }
         # ====================================================
 
-        cv_splitter = create_time_series_cv_splits(df=df_with_indicators, date_col='date', ticker_col='ticker', initial_train_period=initial_train_td, test_period=test_td, step_period=step_td, expanding=USE_EXPANDING_WINDOW)
-        all_split_results = {} # Lưu kết quả tất cả splits
+        cv_splitter = create_time_series_cv_splits(
+            df=df_with_indicators, date_col='date', ticker_col='ticker', 
+            initial_train_period=initial_train_td, 
+            test_period=test_td, 
+            step_period=step_td, 
+            expanding=USE_EXPANDING_WINDOW
+        )
+        all_split_results = {}
 
         for split_idx, train_df_orig, test_df_orig in cv_splitter:
             print(f"\n===== Processing CV Split {split_idx} =====")
-            results_this_split = {} # Lưu kết quả split này
+            results_this_split = {}
 
-            # ---- Chuẩn bị dữ liệu ----
             prep_data = prepare_split_data(
                 train_df_orig, test_df_orig, FEATURE_COLS, LAG_PERIODS,
                 TARGET_COL_PCT, TARGET_COL_TREND, TREND_THRESHOLD, N_TIMESTEPS
             )
 
-            # ---- Chạy Mô hình & Đánh giá ----
             if prep_data.get('data_valid', False):
                 # ARIMA
                 arima_results = arima_model.run_arima_evaluation(
-                    train_df=prep_data['train_df'], test_df=prep_data['test_df'],
-                    target_col_trend=TARGET_COL_TREND, trend_threshold=TREND_THRESHOLD)
+                    prep_data['train_df'], prep_data['test_df'],
+                    TARGET_COL_TREND, TREND_THRESHOLD) # Sử dụng biến từ configs (đã gán ở trên)
                 results_this_split.update(arima_results)
-
-                # XÓA HOẶC COMMENT OUT PHẦN GARCH MODEL RIÊNG LẺ
-                # if ARCH_INSTALLED:
-                #     garch_results = garch_model.run_garch_analysis(...)
-                #     results_this_split.update(garch_results)
-                # else:
-                #     results_this_split.update({"GARCH_Accuracy": np.nan, ...})
-                # Thay vào đó, thêm placeholder NaN cho GARCH như một mô hình (nếu vẫn muốn cột đó)
+                
+                # GARCH placeholder
                 results_this_split.update({"GARCH_Accuracy": np.nan, "GARCH_F1_Macro": np.nan, "GARCH_F1_Weighted": np.nan,
                                            "GARCH_Precision_Macro": np.nan, "GARCH_Recall_Macro": np.nan})
 
-                # RandomForest (after tuning v0.1)
+                # RandomForest
                 rf_results = rf_model.run_rf_evaluation(
                     prep_data['X_train_scaled'], prep_data['y_train_ml'],
                     prep_data['X_test_scaled'], prep_data['y_test_ml'],
-                    n_iter_search=N_ITER_SEARCH_SKLEARN,
-                    cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN
+                    n_iter_search=N_ITER_SEARCH_SKLEARN, # Sử dụng biến từ configs
+                    cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN # Sử dụng biến từ configs
                 )
                 results_this_split.update(rf_results)
 
-                # ===== GỌI XGBOOST (after tuning v0.1)=====
+                # XGBoost
                 if XGB_INSTALLED:
                      xgb_results = xgboost_model.run_xgboost_evaluation(
                          prep_data['X_train_scaled'], prep_data['y_train_ml'],
                          prep_data['X_test_scaled'], prep_data['y_test_ml'],
-                         n_iter_search=N_ITER_SEARCH_SKLEARN,
-                         cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN
+                         n_iter_search=N_ITER_SEARCH_SKLEARN, # Sử dụng biến từ configs
+                         cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN # Sử dụng biến từ configs
                      )
                      results_this_split.update(xgb_results)
-                # =======================
-
-                # --- SVM (SVC) (after tuning v0.1) ---
+                
+                # SVM
                 if SKLEARN_INSTALLED:
                     svm_results = svm_model.run_svm_evaluation(
                         prep_data['X_train_scaled'], prep_data['y_train_ml'],
                         prep_data['X_test_scaled'], prep_data['y_test_ml'],
-                        n_iter_search=N_ITER_SEARCH_SKLEARN,
-                        cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN
+                        n_iter_search=N_ITER_SEARCH_SKLEARN, # Sử dụng biến từ configs
+                        cv_folds_tuning=CV_FOLDS_TUNING_SKLEARN # Sử dụng biến từ configs
                     )
                     results_this_split.update(svm_results)
-                else:
+                else: # Placeholder
                     results_this_split.update({"SVM_Accuracy": np.nan, "SVM_F1_Macro": np.nan, "SVM_F1_Weighted": np.nan,
                                                "SVM_Precision_Macro": np.nan, "SVM_Recall_Macro": np.nan})
-
-                # LSTM (truyền tham số)
+                
                 current_n_features = prep_data['X_train_scaled'].shape[1] if prep_data['X_train_scaled'].ndim == 2 else prep_data['X_train_seq'].shape[2]
-
+                
+                # LSTM
                 lstm_results = lstm_model.run_lstm_evaluation(
                     prep_data['X_train_seq'], prep_data['y_train_seq'], prep_data['X_test_seq'],
                     prep_data['y_test_seq_original_trend'], prep_data['class_weight_dict'], prep_data['n_classes'],
-                    N_TIMESTEPS, current_n_features, # SỬ DỤNG current_n_features
-                    **lstm_params_set
+                    N_TIMESTEPS, current_n_features,
+                    **lstm_params_set # Truyền dict tham số từ configs
                 )
                 results_this_split.update(lstm_results)
 
-
-                # Transformer (truyền tham số)
+                # Transformer
                 transformer_results = transformer_model.run_transformer_evaluation(
                     prep_data['X_train_seq'], prep_data['y_train_seq'], prep_data['X_test_seq'],
                     prep_data['y_test_seq_original_trend'], prep_data['class_weight_dict'], prep_data['n_classes'],
-                    N_TIMESTEPS, current_n_features, # SỬ DỤNG current_n_features
-                    **transformer_params_set
+                    N_TIMESTEPS, current_n_features,
+                    **transformer_params_set # Truyền dict tham số từ configs
                 )
                 results_this_split.update(transformer_results)
 
@@ -386,7 +392,7 @@ def run_all_experiments():
 
                 # ===== LƯU KẾT QUẢ TỔNG HỢP VÀ CHI TIẾT RA CSV =====
                 try:
-                    results_output_dir = project_root / "results"
+                    results_output_dir = configs.RESULTS_DIR # <--- THAY ĐỔI
                     results_output_dir.mkdir(parents=True, exist_ok=True)
 
                     # Lưu file summary (chỉ chứa mean, std của các metric hợp lệ)

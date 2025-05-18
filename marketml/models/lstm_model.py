@@ -43,11 +43,16 @@ def run_lstm_evaluation(X_train_seq, y_train_seq, X_test_seq, y_test_original_tr
         keras.backend.clear_session()
 
         # Lấy tham số tuning từ kwargs hoặc dùng giá trị mặc định
-        lstm_units = kwargs.get('lstm_units', 64) # Thử 32, 64, 128
-        dropout_rate = kwargs.get('dropout_rate', 0.3) # Thử 0.3 - 0.5
+        lstm_units = kwargs.get('lstm_units', 64)
+        dropout_rate = kwargs.get('dropout_rate', 0.3)
         learning_rate = kwargs.get('learning_rate', 1e-4)
-        epochs = kwargs.get('epochs', 50) # Tăng epochs, dùng EarlyStopping
-        batch_size = kwargs.get('batch_size', 64) # Thử 32, 64, 128
+        epochs = kwargs.get('epochs', 50)
+        batch_size = kwargs.get('batch_size', 64)
+        validation_split = kwargs.get('validation_split', 0.1) # Lấy từ kwargs
+        early_stopping_patience = kwargs.get('early_stopping_patience', 10) # Lấy từ kwargs
+        reduce_lr_patience = kwargs.get('reduce_lr_patience', 5) # Lấy từ kwargs
+        reduce_lr_factor = kwargs.get('reduce_lr_factor', 0.2) # Lấy từ kwargs
+        min_lr = kwargs.get('min_lr', 1e-6) # Lấy từ kwargs
 
         print(f"  Training LSTM with params: units={lstm_units}, dropout={dropout_rate}, lr={learning_rate}, epochs={epochs}, batch_size={batch_size}")
 
@@ -60,6 +65,19 @@ def run_lstm_evaluation(X_train_seq, y_train_seq, X_test_seq, y_test_original_tr
 
         optimizer = Adam(learning_rate=learning_rate)
         lstm_model.compile(loss='sparse_categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+
+        callbacks_list = []
+        callbacks_list.append(EarlyStopping(monitor='val_loss', patience=early_stopping_patience, restore_best_weights=True, verbose=0))
+        callbacks_list.append(ReduceLROnPlateau(monitor='val_loss', factor=reduce_lr_factor, patience=reduce_lr_patience, min_lr=min_lr, verbose=0))
+
+        print(f"    Training LSTM for up to {epochs} epochs with EarlyStopping and ReduceLROnPlateau...")
+        history_lstm = lstm_model.fit(
+            X_train_seq, y_train_seq, epochs=epochs, batch_size=batch_size,
+            class_weight=class_weight_dict, validation_split=validation_split, # Sử dụng validation_split
+            shuffle=True,
+            callbacks=callbacks_list, # Sử dụng list callbacks
+            verbose=0
+        )
 
         # Callbacks
         early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=0)
