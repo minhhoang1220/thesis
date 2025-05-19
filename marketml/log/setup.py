@@ -3,6 +3,8 @@ import warnings
 import logging
 from pathlib import Path
 
+_project_logger_configured = False # Biến cờ toàn cục cho module này
+
 def suppress_common_warnings():
     """
     Bỏ qua các warnings thường gặp không quan trọng từ các thư viện.
@@ -37,42 +39,45 @@ def suppress_common_warnings():
     print("Warnings suppressed.")
 
 def setup_basic_logging(log_level=logging.INFO, log_file_name="project.log"):
-    """
-    Thiết lập logging cơ bản cho project.
-    Ghi log ra console và file.
-    """
-    project_root = Path(__file__).resolve().parents[2] # Giả sử file này nằm trong .ndmh/marketml/utils/
-    logs_dir = project_root / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    log_file_path = logs_dir / log_file_name
+    global _project_logger_configured
+    
+    logger = logging.getLogger("marketml_project")  # Luôn lấy logger gốc này
 
-    # Tạo logger chính cho project (ví dụ: 'marketml')
-    # Các module khác có thể lấy logger này bằng logging.getLogger('marketml')
-    # Hoặc đơn giản là logging.getLogger(__name__) để lấy logger của module hiện tại
-    logger = logging.getLogger("marketml_project") # Đặt tên logger chung
-    logger.setLevel(log_level)
+    # Chỉ cấu hình nếu chưa được cấu hình trước đó
+    if not _project_logger_configured:
+        project_root = Path(__file__).resolve().parents[2]
+        logs_dir = project_root / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        log_file_path = logs_dir / log_file_name
 
-    # Xóa các handler cũ nếu có để tránh ghi log nhiều lần khi gọi lại hàm này
-    if logger.hasHandlers():
-        logger.handlers.clear()
+        # Xóa tất cả handlers hiện có để tránh lặp
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+            handler.close()
 
-    # Formatter
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        logger.setLevel(log_level)
+        
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    # Console Handler
-    ch = logging.StreamHandler()
-    ch.setLevel(log_level)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+        # Chỉ thêm StreamHandler nếu chưa có
+        if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+            ch = logging.StreamHandler()
+            ch.setLevel(log_level)
+            ch.setFormatter(formatter)
+            logger.addHandler(ch)
 
-    # File Handler
-    fh = logging.FileHandler(log_file_path)
-    fh.setLevel(log_level)
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
+        # Chỉ thêm FileHandler nếu chưa có
+        if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+            fh = logging.FileHandler(log_file_path)
+            fh.setLevel(log_level)
+            fh.setFormatter(formatter)
+            logger.addHandler(fh)
 
-    logger.info(f"Logging setup complete. Log level: {logging.getLevelName(log_level)}. Log file: {log_file_path}")
+        logger.propagate = False  # Quan trọng: ngăn không cho log lan truyền lên logger cha
+        _project_logger_configured = True
+
     return logger
+
 
 # Bạn có thể thêm các hàm thiết lập khác ở đây nếu cần
 # Ví dụ: thiết lập seed cho random number generators

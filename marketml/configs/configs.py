@@ -8,8 +8,8 @@ import pandas as pd # Cần cho pd.Timedelta
 # Để đơn giản, tôi sẽ giả định các script chạy chính vẫn tự quản lý base_path.
 # Tuy nhiên, các đường dẫn output có thể đặt ở đây.
 PROJECT_ROOT = Path(__file__).resolve().parents[2] # .ndmh/
-RESULTS_DIR = PROJECT_ROOT / "results" # Lưu kết quả vào .ndmh/results/
-FORECASTS_DIR = PROJECT_ROOT / "forecasts" # Lưu dự báo vào .ndmh/forecasts/
+RESULTS_DIR = PROJECT_ROOT / "marketml" / "results" # Lưu kết quả vào .ndmh/marketml/results/
+FORECASTS_DIR = PROJECT_ROOT / "marketml" / "forecasts" # Lưu dự báo vào .ndmh/marketml/forecasts/
 ENRICHED_DATA_DIR = PROJECT_ROOT / "marketml" / "data" / "processed"
 ENRICHED_DATA_FILE = ENRICHED_DATA_DIR / "price_data_enriched_v2.csv" # File enriched data chính
 
@@ -33,8 +33,6 @@ ROLLING_STAT_WINDOWS = [5, 10]
 PRICE_ZSCORE_WINDOW = 20
 LAG_PERIODS = [1, 3, 5]
 TREND_THRESHOLD = 0.002
-
-# --- CROSS-VALIDATION PARAMETERS for run_experiment.py ---
 INITIAL_TRAIN_YEARS = 1
 TEST_YEARS = 1
 STEP_YEARS = 1
@@ -42,42 +40,28 @@ USE_EXPANDING_WINDOW = True
 INITIAL_TRAIN_TIMEDELTA = pd.Timedelta(days=365 * INITIAL_TRAIN_YEARS)
 TEST_TIMEDELTA = pd.Timedelta(days=365 * TEST_YEARS)
 STEP_TIMEDELTA = pd.Timedelta(days=365 * STEP_YEARS)
-
-# --- MODEL TRAINING & TUNING PARAMETERS for run_experiment.py ---
-# General
 TARGET_COL_PCT = 'target_pct_change'
 TARGET_COL_TREND = 'target_trend'
-
-# SKLearn-based models (RF, XGB, SVM)
-N_ITER_SEARCH_SKLEARN = 30 # Số lần thử cho RandomizedSearchCV
-CV_FOLDS_TUNING_SKLEARN = 3 # Số fold CV cho tuning nội bộ của RandomizedSearchCV
-
-# Keras-based models (LSTM, Transformer)
-N_TIMESTEPS_SEQUENCE = 10 # Số bước thời gian cho chuỗi
+N_ITER_SEARCH_SKLEARN = 30
+CV_FOLDS_TUNING_SKLEARN = 3
+N_TIMESTEPS_SEQUENCE = 10
 KERAS_EPOCHS = 50
 KERAS_BATCH_SIZE = 64
-KERAS_VALIDATION_SPLIT = 0.1 # Tỷ lệ dữ liệu dùng cho validation trong quá trình train Keras
+KERAS_VALIDATION_SPLIT = 0.1
 KERAS_EARLY_STOPPING_PATIENCE = 10
 KERAS_REDUCE_LR_PATIENCE = 5
 KERAS_REDUCE_LR_FACTOR = 0.2
 KERAS_MIN_LR = 1e-6
-
-# LSTM Specific
 LSTM_UNITS = 128
 LSTM_DROPOUT_RATE = 0.25
 LSTM_LEARNING_RATE = 5e-5
-
-# Transformer Specific
 TRANSFORMER_NUM_BLOCKS = 2
 TRANSFORMER_HEAD_SIZE = 128
 TRANSFORMER_NUM_HEADS = 4
 TRANSFORMER_FF_DIM = 128
-TRANSFORMER_DROPOUT_RATE = 0.35 # KERAS_DROPOUT_RATE + 0.1
+TRANSFORMER_DROPOUT_RATE = 0.35
 TRANSFORMER_LEARNING_RATE = 5e-5
 TRANSFORMER_WEIGHT_DECAY = 1e-4
-
-# --- FEATURE COLUMNS for run_experiment.py ---
-# (Lưu ý: các cột lag sẽ được thêm tự động dựa trên LAG_PERIODS)
 BASE_FEATURE_COLS = [
     'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'BB_Upper', 'BB_Lower', 'EMA_20',
     'volume', 'garch_vol_forecast', 'OBV',
@@ -89,9 +73,51 @@ BASE_FEATURE_COLS = [
 ]
 
 # --- FORECAST_FUTURE.PY PARAMETERS ---
-# (Lưu ý: file enriched cho forecast_future nên là file được tạo bởi create_enriched_data.py)
 FORECAST_YEAR_TARGET = 2025
-FORECAST_TRAINING_YEARS = 3 # Số năm dữ liệu lịch sử cuối cùng để huấn luyện ARIMA
-FORECAST_TREND_THRESHOLD = 0.002 # Ngưỡng trend cho dự báo ARIMA
+FORECAST_TRAINING_YEARS = 3
+FORECAST_TREND_THRESHOLD = 0.002
 APPROX_TRADING_DAYS_PER_YEAR = 252
-ENRICHED_DATA_FOR_FORECAST = PROJECT_ROOT / "marketml" / "data" / "processed" / "price_data_with_indicators.csv" # *Đảm bảo file này được tạo bởi create_enriched_data.py*
+ENRICHED_DATA_FOR_FORECAST = ENRICHED_DATA_FILE # Dùng chung file enriched chính
+
+# --- GENERAL PROJECT SETTINGS ---
+RANDOM_SEED = 42
+
+# --- PORTFOLIO OPTIMIZATION PARAMETERS ---
+PORTFOLIO_ASSETS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'F', 'JNJ', 'JPM', 'V', 'PG', 'UNH', 'XOM', 'NFLX']
+# PORTFOLIO_ASSETS = None # Để None nếu muốn dùng tất cả tickers có trong dữ liệu sau khi lọc theo ngày
+
+PORTFOLIO_START_DATE = "2023-01-01"
+PORTFOLIO_END_DATE = "2023-12-31" # Dùng dữ liệu 2023 để backtest
+REBALANCE_FREQUENCY = 'BM' # 'BM': Business Month End, 'BQS': Business Quarter Start, 'W-FRI': Weekly Friday, or integer (days)
+
+FINANCIAL_DATA_FILE_PATH = PROJECT_ROOT / "financial_data.csv" # Đảm bảo file này ở thư mục gốc .ndmh/
+PRICE_DATA_FOR_PORTFOLIO_PATH = ENRICHED_DATA_FILE # Dùng file enriched cho dữ liệu giá
+# File chứa xác suất sẽ được tạo ra
+CLASSIFICATION_PROBS_FILE_PATH = RESULTS_DIR / "classification_probabilities.csv" # Sẽ lưu vào .ndmh/results/
+
+ROLLING_WINDOW_COVARIANCE = 60 # ~3 tháng giao dịch
+ROLLING_WINDOW_RETURNS = 20  # ~1 tháng giao dịch
+
+# Markowitz Parameters
+MARKOWITZ_OBJECTIVE = 'max_sharpe'
+MARKOWITZ_RISK_FREE_RATE = 0.02 # Giả định lãi suất phi rủi ro 2%/năm
+MARKOWITZ_WEIGHT_BOUNDS = (0.01, 0.3) # Min 1%, Max 30% cho mỗi tài sản
+
+# Black-Litterman Parameters
+BL_TAU = 0.025
+BL_RISK_AVERSION = 2.5 # Delta (nếu tính market implied returns, hoặc dùng trong utility function của portfolio)
+BL_PROB_THRESHOLD_STRONG_VIEW = 0.65
+BL_VIEW_CONFIDENCE_STRONG = 0.8 # Độ tin cậy (1 - variance scale) cho view mạnh
+BL_EXPECTED_OUTPERFORMANCE_STRONG = 0.05 # Kỳ vọng 5% outperform hàng năm cho view mạnh
+
+# Backtesting Parameters
+INITIAL_CAPITAL = 100000
+TRANSACTION_COST_BPS = 5 # 5 bps = 0.05%
+# BENCHMARK_TICKER = '^GSPC' # Cần lấy dữ liệu giá cho S&P 500 nếu muốn so sánh
+# BENCHMARK_WEIGHTS = None # Hoặc danh mục 1/N
+
+# Soft Signal Generation (từ classification model)
+SOFT_SIGNAL_MODEL_NAME = 'XGBoost' # Model tốt nhất của bạn
+SOFT_SIGNAL_TRAIN_END_DATE = "2022-12-31" # Huấn luyện model đến hết năm 2022
+SOFT_SIGNAL_PREDICT_START_DATE = PORTFOLIO_START_DATE # Dự đoán cho năm 2023
+SOFT_SIGNAL_PREDICT_END_DATE = PORTFOLIO_END_DATE

@@ -396,7 +396,7 @@ def run_all_experiments():
                     results_output_dir.mkdir(parents=True, exist_ok=True)
 
                     # Lưu file summary (chỉ chứa mean, std của các metric hợp lệ)
-                    summary_file_path = results_output_dir / "model_performance_summary.csv"
+                    summary_file_path = results_output_dir / "marketml" / "model_performance_summary.csv"
                     if not df_to_save_summary.empty:
                         df_to_save_summary.to_csv(summary_file_path)
                         print(f"\nPerformance summary (mean, std) saved to: {summary_file_path.resolve()}")
@@ -404,7 +404,7 @@ def run_all_experiments():
                         print("No summary data (mean, std) to save (empty or all NaNs after aggregation).")
 
                     # Lưu kết quả chi tiết của từng split (df_to_save_detailed là final_results_df đã được xử lý)
-                    detailed_results_file_path = results_output_dir / "model_performance_detailed.csv"
+                    detailed_results_file_path = results_output_dir / "marketml" / "model_performance_detailed.csv"
                     if not df_to_save_detailed.empty: # df_to_save_detailed là final_results_df
                         df_to_save_detailed.to_csv(detailed_results_file_path)
                         print(f"Detailed results per split saved to: {detailed_results_file_path.resolve()}")
