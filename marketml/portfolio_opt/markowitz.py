@@ -85,6 +85,9 @@ def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame):
         return cleaned_weights
     except Exception as e:
         logger.error(f"Error during Markowitz optimization with PyPortfolioOpt: {e}")
+        logger.debug(f"Mu values at time of error for Markowitz: {mu_cleaned.to_dict()}") # In mu
+        logger.debug(f"Covariance matrix S at time of error for Markowitz (sample):\n{S_cleaned.iloc[:5,:5].to_string()}") # In S
+        logger.debug(f"Risk-free rate: {configs.MARKOWITZ_RISK_FREE_RATE}")
         # Trả về trọng số đều nếu lỗi
         num_assets = len(mu_cleaned.index)
         logger.warning(f"Defaulting to equal weights for {num_assets} assets due to optimization error.")

@@ -4,6 +4,7 @@ import numpy as np
 from pathlib import Path
 import logging
 import sys
+from pypfopt import risk_models
 
 # --- Thêm project root vào sys.path ---
 # Giả định data_preparation.py nằm trong .ndmh/marketml/portfolio_opt/
@@ -174,17 +175,77 @@ def get_prepared_data_for_rebalance_date(
     returns_for_cov_calc = all_daily_returns[all_daily_returns.index < rebalance_date]
     S_daily = pd.DataFrame(index=all_prices_pivot.columns, columns=all_prices_pivot.columns, dtype=float)
     if not returns_for_cov_calc.empty:
-        if len(returns_for_cov_calc) >= configs.ROLLING_WINDOW_COVARIANCE:
-            S_calculated_daily = returns_for_cov_calc.iloc[-configs.ROLLING_WINDOW_COVARIANCE:].cov()
+        # Lấy dữ liệu returns cho cửa sổ rolling
+        rolling_returns_for_cov = returns_for_cov_calc.iloc[-configs.ROLLING_WINDOW_COVARIANCE:]
+
+        # Điều kiện để sử dụng shrinkage: số quan sát (ngày) >= số tài sản
+        # PyPortfolioOpt's CovarianceShrinkage có thể xử lý trường hợp ít quan sát hơn,
+        # nhưng sample_cov() truyền thống sẽ kém ổn định.
+        if len(rolling_returns_for_cov) >= len(all_prices_pivot.columns) and len(rolling_returns_for_cov) >= configs.ROLLING_WINDOW_COVARIANCE * 0.8: # Cần đủ dữ liệu cho cửa sổ và ít nhất bằng số tài sản
+            try:
+                # Sử dụng Ledoit-Wolf shrinkage
+                # `prices_data=False` vì chúng ta đang truyền returns_data
+                # `frequency` ở đây là của dữ liệu input (daily returns), không phải để annualize
+                # PyPortfolioOpt's risk_models.CovarianceShrinkage(prices_df).ledoit_wolf()
+                # lại nhận prices_df, không phải returns.
+                # Chúng ta sẽ dùng hàm trực tiếp từ pypfopt.risk_models nếu có,
+                # hoặc dùng sample_cov rồi có thể áp dụng shrinkage nếu cần.
+                # Cách đơn giản nhất là dùng sample_cov nếu muốn tự kiểm soát,
+                # hoặc nếu muốn shrinkage, có thể dùng các hàm như `ledoit_wolf_single_factor`
+                # nếu có returns.
+                # Tuy nhiên, `risk_models.CovarianceShrinkage(prices_df_for_shrinkage).ledoit_wolf()`
+                # là cách chuẩn của PyPortfolioOpt. Nó cần giá, không phải returns.
+                # Vậy, chúng ta cần lấy slice giá tương ứng.
+                
+                # Lấy slice giá cho cửa sổ tính covariance
+                prices_for_cov_shrinkage = all_prices_pivot.loc[rolling_returns_for_cov.index] # Lấy giá tại các ngày có returns
+                # Đảm bảo không có cột nào toàn NaN trong slice giá này
+                prices_for_cov_shrinkage_cleaned = prices_for_cov_shrinkage.dropna(axis=1, how='all')
+                
+                if not prices_for_cov_shrinkage_cleaned.empty and prices_for_cov_shrinkage_cleaned.shape[0] >= prices_for_cov_shrinkage_cleaned.shape[1]:
+                    S_calculated_daily = risk_models.CovarianceShrinkage(prices_for_cov_shrinkage_cleaned, returns_data=False, frequency=252).ledoit_wolf()
+                    # frequency=252 ở đây sẽ annualize S, chúng ta cần S daily trước
+                    # Nên có thể dùng sample_cov() rồi sau đó tự annualize
+                    # Hoặc nếu ledoit_wolf trả về S_annual, ta cần de-annualize nó.
+                    # Để đơn giản và nhất quán: tính sample_cov daily, rồi annualize sau.
+                    # Nếu muốn shrinkage, nên apply shrinkage lên S_daily.
+                    # PyPortfolioOpt không có hàm shrinkage trực tiếp cho S_daily đã có.
+                    # ---> QUAY LẠI SAMPLE_COV cho S_daily, sau đó có thể xem xét các phương pháp shrinkage phức tạp hơn nếu cần.
+                    # Hiện tại, giữ sample_cov để đảm bảo logic rõ ràng.
+
+                    logger.debug(f"Calculating sample covariance for {len(rolling_returns_for_cov)} days at {rebalance_date.date()}.")
+                    S_calculated_daily = rolling_returns_for_cov.cov()
+
+                else: # Fallback nếu không đủ dữ liệu cho shrinkage hoặc prices
+                    logger.warning(f"Not enough data or valid prices for Covariance Shrinkage at {rebalance_date.date()}. Falling back to sample covariance or diagonal.")
+                    if len(rolling_returns_for_cov) >= 2: # Cần ít nhất 2 điểm để tính cov
+                        S_calculated_daily = rolling_returns_for_cov.cov()
+                    else: # Không đủ để tính sample cov
+                        S_calculated_daily = pd.DataFrame(np.diag(np.full(len(all_prices_pivot.columns), 1e-6)), index=all_prices_pivot.columns, columns=all_prices_pivot.columns)
+
+            except Exception as e_cov:
+                logger.error(f"Error calculating covariance at {rebalance_date.date()}: {e_cov}. Using diagonal matrix.")
+                variances_daily = rolling_returns_for_cov.var().reindex(all_prices_pivot.columns, fill_value=1e-6)
+                variances_daily[variances_daily <= 0] = 1e-6
+                S_calculated_daily = pd.DataFrame(np.diag(variances_daily.values), index=all_prices_pivot.columns, columns=all_prices_pivot.columns)
+
+            S_daily = S_calculated_daily.reindex(index=all_prices_pivot.columns, columns=all_prices_pivot.columns).fillna(0)
+            for ticker in S_daily.index: # Đảm bảo đường chéo không phải là 0 và dương
+                if pd.isna(S_daily.loc[ticker, ticker]) or S_daily.loc[ticker, ticker] <= 0 :
+                    S_daily.loc[ticker, ticker] = 1e-6 # Giá trị dương rất nhỏ
+
+        elif len(rolling_returns_for_cov) >= 2 : # Không đủ cho window dài nhưng đủ để tính sample cov
+            logger.warning(f"Not enough data for ROLLING_WINDOW_COVARIANCE ({configs.ROLLING_WINDOW_COVARIANCE}) at {rebalance_date.date()} (have {len(rolling_returns_for_cov)} days). Using sample covariance on available data.")
+            S_calculated_daily = rolling_returns_for_cov.cov()
             S_daily = S_calculated_daily.reindex(index=all_prices_pivot.columns, columns=all_prices_pivot.columns).fillna(0)
             for ticker in S_daily.index:
-                if S_daily.loc[ticker, ticker] == 0 : S_daily.loc[ticker, ticker] = 1e-6
-        else:
-            logger.warning(f"Not enough data for ROLLING_WINDOW_COVARIANCE ({configs.ROLLING_WINDOW_COVARIANCE}) at {rebalance_date.date()} for daily S. Using diagonal matrix.")
-            variances_daily = returns_for_cov_calc.var().reindex(all_prices_pivot.columns, fill_value=1e-6)
-            variances_daily[variances_daily <= 0] = 1e-6
-            S_daily = pd.DataFrame(np.diag(variances_daily.values), index=all_prices_pivot.columns, columns=all_prices_pivot.columns)
-    else:
+                if pd.isna(S_daily.loc[ticker, ticker]) or S_daily.loc[ticker, ticker] <= 0 :
+                    S_daily.loc[ticker, ticker] = 1e-6
+        else: # Không đủ dữ liệu để tính sample covariance (ví dụ, ít hơn 2 ngày returns)
+            logger.warning(f"Not enough data (have {len(rolling_returns_for_cov)} days) to calculate any covariance at {rebalance_date.date()}. Using diagonal identity matrix.")
+            S_daily = pd.DataFrame(np.diag(np.full(len(all_prices_pivot.columns), 1e-6)), index=all_prices_pivot.columns, columns=all_prices_pivot.columns)
+    else: # Nếu returns_for_cov_calc rỗng (ngày đầu tiên của dữ liệu)
+        logger.warning(f"No historical returns available to calculate covariance at {rebalance_date.date()}. Using diagonal identity matrix.")
         S_daily = pd.DataFrame(np.diag(np.full(len(all_prices_pivot.columns), 1e-6)), index=all_prices_pivot.columns, columns=all_prices_pivot.columns)
 
     # --- ANNUALIZE mu and S ---
@@ -251,18 +312,29 @@ def get_prepared_data_for_rebalance_date(
             current_classification_probs[ticker] = 0.5
 
     # Đảm bảo mu_annualized và S_annualized có cùng thứ tự cột/index
-    common_tickers = all_prices_pivot.columns.intersection(mu_annualized.index).intersection(S_annualized.index)
-    if len(common_tickers) < len(all_prices_pivot.columns):
-        logger.warning(f"Some tickers are missing from calculated annualized mu/S for {rebalance_date.date()}. Using intersection: {len(common_tickers)} tickers.")
+    common_tickers = S_annualized.index 
     
     mu_final = mu_annualized.reindex(common_tickers).fillna(0)
     S_final = S_annualized.reindex(index=common_tickers, columns=common_tickers).fillna(0)
-    for ticker in S_final.index:
-        if S_final.loc[ticker, ticker] == 0: S_final.loc[ticker, ticker] = 1e-6 # Cho phương sai rất nhỏ nếu = 0
+    
+    # Đảm bảo ma trận hiệp phương sai là positive semi-definite và đường chéo > 0
+    # Cách đơn giản nhất là đảm bảo phương sai trên đường chéo là dương
+    for ticker_idx in S_final.index:
+        if S_final.loc[ticker_idx, ticker_idx] <= 0:
+            S_final.loc[ticker_idx, ticker_idx] = 1e-6 # Một giá trị dương nhỏ
+            # Đặt các hiệp phương sai của ticker này với các ticker khác về 0 nếu phương sai của nó là 0 (để tránh vấn đề)
+            for other_ticker_idx in S_final.columns:
+                if ticker_idx != other_ticker_idx:
+                    S_final.loc[ticker_idx, other_ticker_idx] = 0
+                    S_final.loc[other_ticker_idx, ticker_idx] = 0
+    
+    # Kiểm tra lại nếu mu_final có NaN sau reindex (ít khả năng nếu đã fill_value=0)
+    mu_final.fillna(0, inplace=True)
+
 
     logger.debug(f"Data prepared for {rebalance_date.date()}: mu_annualized shape {mu_final.shape}, S_annualized shape {S_final.shape}, "
                  f"{len(current_financial_data)} financial records, {len(current_classification_probs)} probability records.")
-    return mu_final, S_final, current_financial_data, current_classification_probs # Trả về mu và S đã được annualize
+    return mu_final, S_final, current_financial_data, current_classification_probs
 
 if __name__ == '__main__':
     # --- Phần này để test nhanh các hàm trong file này ---

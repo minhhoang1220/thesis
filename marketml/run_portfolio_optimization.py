@@ -14,9 +14,8 @@ sys.path.insert(0, str(PROJECT_ROOT_SCRIPT))
 try:
     from marketml.configs import configs
     from marketml.log import setup # Giả sử bạn đã đặt environment_setup.py thành setup.py trong log
-    from marketml.portfolio_opt import data_preparation, markowitz, backtesting
-    # Thêm black_litterman sau:
-    # from marketml.portfolio_opt import black_litterman
+    from marketml.portfolio_opt import data_preparation, markowitz, black_litterman, backtesting
+    from pypfopt import risk_models, expected_returns
 except ImportError as e:
     print(f"CRITICAL ERROR in run_portfolio_optimization.py: Could not import necessary modules. {e}")
     sys.exit(1)
@@ -107,14 +106,19 @@ def update_portfolio_values_daily(rebalance_history_df, all_prices_pivot):
     for current_date in all_trading_days_in_period:
         if current_date in rebalance_history_df.index:
             rebal_entry = rebalance_history_df.loc[current_date]
-            daily_portfolio_df.at[current_date, 'value'] = rebal_entry['value'] # SỬ DỤNG .at[]
-            daily_portfolio_df.at[current_date, 'cash'] = rebal_entry['cash']
-            daily_portfolio_df.at[current_date, 'returns'] = rebal_entry['returns']
+            if isinstance(rebal_entry, pd.DataFrame):
+                logger.warning(f"Multiple rebalance entries found for date {current_date}. Using the first one.")
+                rebal_entry = rebal_entry.iloc[0] # Lấy hàng đầu tiên
+
+            # Bây giờ rebal_entry nên là một Series (một hàng)
+            daily_portfolio_df.at[current_date, 'value'] = float(rebal_entry['value'])
+            daily_portfolio_df.at[current_date, 'cash'] = float(rebal_entry['cash'])
+            daily_portfolio_df.at[current_date, 'returns'] = float(rebal_entry['returns'])
             current_weights = rebal_entry['weights'] if isinstance(rebal_entry['weights'], dict) else {}
-            daily_portfolio_df.at[current_date, 'weights'] = current_weights # SỬ DỤNG .at[]
+            daily_portfolio_df.at[current_date, 'weights'] = current_weights 
             
-            last_known_portfolio_value = rebal_entry['value']
-            last_known_cash = rebal_entry['cash']
+            last_known_portfolio_value = float(rebal_entry['value']) # Ép kiểu float
+            last_known_cash = float(rebal_entry['cash'])  
             
             last_known_holdings_shares = {}
             current_prices_on_rebal = all_prices_pivot.loc[current_date]
@@ -174,18 +178,14 @@ def run_portfolio_strategies():
     if all_prices_pivot.empty: logger.error("Price data is empty. Exiting."); return
     
     # Loại bỏ các cột/tickers mà không có dữ liệu giá trong toàn bộ khoảng thời gian backtest
-    # để tránh lỗi khi reindex mu, S
     portfolio_period_prices = all_prices_pivot.loc[pd.to_datetime(configs.PORTFOLIO_START_DATE):pd.to_datetime(configs.PORTFOLIO_END_DATE)]
     valid_tickers_in_period = portfolio_period_prices.dropna(axis=1, how='all').columns
     
-    if len(valid_tickers_in_period) == 0:
-        logger.error(f"No valid tickers found with price data in the portfolio period {configs.PORTFOLIO_START_DATE} to {configs.PORTFOLIO_END_DATE}. Exiting.")
-        return
-    
+    if len(valid_tickers_in_period) == 0: logger.error(f"No valid tickers in portfolio period. Exiting."); return
     if len(valid_tickers_in_period) < len(all_prices_pivot.columns):
-        logger.warning(f"Original tickers count: {len(all_prices_pivot.columns)}. Valid tickers in period: {len(valid_tickers_in_period)}. Using subset: {valid_tickers_in_period.tolist()}")
+        logger.warning(f"Using subset of tickers: {valid_tickers_in_period.tolist()}")
         all_prices_pivot = all_prices_pivot[valid_tickers_in_period]
-        if all_prices_pivot.empty: logger.error("Price data became empty after filtering for valid tickers in period. Exiting."); return
+        if all_prices_pivot.empty: logger.error("Price data empty after subsetting. Exiting."); return
 
     all_daily_returns = data_preparation.calculate_returns(all_prices_pivot)
     if all_daily_returns.empty: logger.error("Daily returns are empty. Exiting."); return
@@ -197,118 +197,235 @@ def run_portfolio_strategies():
     trading_days = all_prices_pivot.loc[pd.to_datetime(configs.PORTFOLIO_START_DATE):pd.to_datetime(configs.PORTFOLIO_END_DATE)].index
     if trading_days.empty: logger.error("No trading days in portfolio period. Exiting."); return
 
+    # Xác định ngày giao dịch đầu tiên trong khoảng thời gian portfolio
+    first_portfolio_day = pd.to_datetime(configs.PORTFOLIO_START_DATE)
+    actual_first_trading_day_in_pf_period = trading_days[trading_days >= first_portfolio_day].min()
+    logger.info(f"Actual first trading day in portfolio period: {actual_first_trading_day_in_pf_period.date()}")
+
+    # Xác định các ngày tái cân bằng
     if isinstance(configs.REBALANCE_FREQUENCY, str):
         rebalance_dates_potential = pd.date_range(start=configs.PORTFOLIO_START_DATE, end=configs.PORTFOLIO_END_DATE, freq=configs.REBALANCE_FREQUENCY)
-        rebalance_dates = trading_days[trading_days.searchsorted(rebalance_dates_potential, side='left')].unique()
         temp_rebalance_dates = []
         for r_date in rebalance_dates_potential:
-            # Tìm ngày giao dịch đầu tiên >= r_date
             actual_rebal_day_candidates = trading_days[trading_days >= r_date]
-            if not actual_rebal_day_candidates.empty:
+            if not actual_rebal_day_candidates.empty: 
                 temp_rebalance_dates.append(actual_rebal_day_candidates[0])
         rebalance_dates = pd.DatetimeIndex(temp_rebalance_dates).unique()
-    elif isinstance(configs.REBALANCE_FREQUENCY, int):
+    elif isinstance(configs.REBALANCE_FREQUENCY, int): 
         rebalance_dates = trading_days[::configs.REBALANCE_FREQUENCY]
-    else:
-        logger.error(f"Invalid REBALANCE_FREQUENCY: {configs.REBALANCE_FREQUENCY}"); return
+    else: 
+        logger.error(f"Invalid REBALANCE_FREQUENCY: {configs.REBALANCE_FREQUENCY}")
+        return
     
     if len(rebalance_dates) == 0: logger.error("No rebalance dates. Check config."); return
-    rebalance_dates = rebalance_dates[rebalance_dates <= pd.to_datetime(configs.PORTFOLIO_END_DATE)] # Đảm bảo không vượt quá ngày cuối
+    rebalance_dates = rebalance_dates[rebalance_dates <= pd.to_datetime(configs.PORTFOLIO_END_DATE)]
     logger.info(f"Rebalance dates ({len(rebalance_dates)}): {rebalance_dates.strftime('%Y-%m-%d').tolist()}")
 
     results_summary = {}
-    all_portfolio_dfs = {} # Để lưu daily dfs cho các chiến lược
+    all_portfolio_dfs = {}
+    asset_tickers_ordered = all_prices_pivot.columns.tolist()
 
     # --- Chiến lược 1: Markowitz ---
     logger.info("\n--- Running Markowitz Strategy ---")
     markowitz_backtester = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL, configs.TRANSACTION_COST_BPS)
-    
-    # Thêm một entry ban đầu tại ngày bắt đầu portfolio nếu ngày đó không phải là ngày rebalance đầu tiên
-    # để `update_portfolio_values_daily` có điểm khởi đầu.
-    first_portfolio_day = pd.to_datetime(configs.PORTFOLIO_START_DATE)
-    # Tìm ngày giao dịch thực tế đầu tiên >= first_portfolio_day
-    actual_first_trading_day_in_pf_period = trading_days[trading_days >= first_portfolio_day].min()
+
+    initial_rebal_date_mw = actual_first_trading_day_in_pf_period
+    logger.info(f"Markowitz: Initial processing for {initial_rebal_date_mw.date()}...")
+    mu_initial_mw, S_initial_mw, _, _ = data_preparation.get_prepared_data_for_rebalance_date(
+        initial_rebal_date_mw, all_prices_pivot, all_daily_returns, None, None
+    )
+
+    if not mu_initial_mw.empty and not S_initial_mw.empty and not mu_initial_mw.isnull().all() and not S_initial_mw.isnull().all().all():
+        target_weights_initial_mw = markowitz.optimize_markowitz_portfolio(mu_initial_mw, S_initial_mw)
+        prices_initial_mw = all_prices_pivot.loc[initial_rebal_date_mw]
+        if not prices_initial_mw.isnull().all():
+            markowitz_backtester.rebalance(initial_rebal_date_mw, target_weights_initial_mw, prices_initial_mw)
+        else:
+            logger.warning(f"All prices NaN on Markowitz initial rebalance {initial_rebal_date_mw.date()}. Starting with cash.")
+            markowitz_backtester.portfolio_history.append({'date': initial_rebal_date_mw, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+    else:
+        logger.warning(f"Empty/NaN mu/S on Markowitz initial rebalance {initial_rebal_date_mw.date()}. Starting with cash.")
+        markowitz_backtester.portfolio_history.append({'date': initial_rebal_date_mw, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
 
     if not rebalance_dates.empty and actual_first_trading_day_in_pf_period < rebalance_dates[0]:
-         markowitz_backtester.portfolio_history.append({
-            'date': actual_first_trading_day_in_pf_period, 
-            'value': configs.INITIAL_CAPITAL,
-            'weights': {}, 
-            'cash': configs.INITIAL_CAPITAL, 
-            'returns': 0.0
-        })
-
+         markowitz_backtester.portfolio_history.append({'date': actual_first_trading_day_in_pf_period, 'value': configs.INITIAL_CAPITAL,'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
     for rebal_date in rebalance_dates:
         logger.info(f"Markowitz: Processing rebalance for {rebal_date.date()}...")
-        mu, S, _, _ = data_preparation.get_prepared_data_for_rebalance_date(
-            rebal_date, all_prices_pivot, all_daily_returns, None, None
-        )
-        mu_annual, S_annual, _, _ = data_preparation.get_prepared_data_for_rebalance_date(
-            rebal_date, all_prices_pivot, all_daily_returns, None, None
-        )
+        mu_annual, S_annual, _, _ = data_preparation.get_prepared_data_for_rebalance_date(rebal_date, all_prices_pivot, all_daily_returns, None, None)
         if mu_annual.empty or S_annual.empty or mu_annual.isnull().all() or S_annual.isnull().all().all():
-            logger.warning(f"Skipping Markowitz rebalance on {rebal_date.date()} due to empty or all-NaN annualized mu/S.")
-            if markowitz_backtester.portfolio_history:
-                last_entry = markowitz_backtester.portfolio_history[-1].copy()
-                last_entry['date'] = rebal_date
-                last_entry['returns'] = 0.0
-                markowitz_backtester.portfolio_history.append(last_entry)
-            elif not markowitz_backtester.portfolio_history and rebal_date == actual_first_trading_day_in_pf_period : # Nếu là ngày đầu tiên và lỗi
-                 markowitz_backtester.portfolio_history.append({'date': rebal_date, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
-            
+            logger.warning(f"Skipping Markowitz rebalance on {rebal_date.date()} due to empty/NaN mu/S.") # ... (xử lý skip) ...
+            if markowitz_backtester.portfolio_history: last_entry = markowitz_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date; last_entry['returns'] = 0.0; markowitz_backtester.portfolio_history.append(last_entry)
+            elif not markowitz_backtester.portfolio_history and rebal_date == actual_first_trading_day_in_pf_period : markowitz_backtester.portfolio_history.append({'date': rebal_date, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+            continue
+        target_weights_mw = markowitz.optimize_markowitz_portfolio(mu_annual, S_annual)
+        prices_on_rebal_date = all_prices_pivot.loc[rebal_date]
+        if prices_on_rebal_date.isnull().all(): # ... (xử lý skip) ...
+             logger.warning(f"All prices NaN on Markowitz rebalance {rebal_date.date()}. Skipping.")
+             if markowitz_backtester.portfolio_history: last_entry = markowitz_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date; last_entry['returns'] = 0.0; markowitz_backtester.portfolio_history.append(last_entry)
+             elif not markowitz_backtester.portfolio_history and rebal_date == actual_first_trading_day_in_pf_period : markowitz_backtester.portfolio_history.append({'date': rebal_date, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+             continue
+        markowitz_backtester.rebalance(rebal_date, target_weights_mw, prices_on_rebal_date)
+    if markowitz_backtester.portfolio_history: markowitz_history_df = pd.DataFrame(markowitz_backtester.portfolio_history).set_index('date')
+    else: markowitz_history_df = pd.DataFrame(columns=['value', 'cash', 'returns', 'weights'])
+    daily_markowitz_perf_df = update_portfolio_values_daily(markowitz_history_df, all_prices_pivot)
+    if daily_markowitz_perf_df is not None and not daily_markowitz_perf_df.empty and 'returns' in daily_markowitz_perf_df:
+        metrics_calculator = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL); results_summary['Markowitz'] = metrics_calculator.calculate_metrics(portfolio_returns_series=daily_markowitz_perf_df['returns'].fillna(0)); all_portfolio_dfs['Markowitz'] = daily_markowitz_perf_df
+        try: configs.RESULTS_DIR.mkdir(parents=True, exist_ok=True); daily_markowitz_perf_df.to_csv(configs.RESULTS_DIR / "markowitz_performance_daily.csv"); logger.info(f"Markowitz daily performance saved.")
+        except Exception as e_save: logger.error(f"Error saving Markowitz performance: {e_save}")
+    else: logger.error("Markowitz daily perf DF empty/missing returns.")
+
+    # --- Chiến lược 2: Black-Litterman ---
+    logger.info("\n--- Running Black-Litterman Strategy ---")
+    bl_backtester = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL, configs.TRANSACTION_COST_BPS)
+    
+    # Xử lý ngày đầu tư đầu tiên cho Black-Litterman (nếu cần)
+    # actual_first_trading_day_in_pf_period đã được định nghĩa ở trên
+    initial_investment_done_bl = False
+    if not rebalance_dates.empty and actual_first_trading_day_in_pf_period < rebalance_dates[0]:
+        initial_rebal_date_bl = actual_first_trading_day_in_pf_period
+        logger.info(f"Black-Litterman: Initial processing for {initial_rebal_date_bl.date()}...")
+        
+        # Lấy dữ liệu cho ngày đầu tư đầu tiên
+        _, _, current_fin_data_init, current_class_probs_init = data_preparation.get_prepared_data_for_rebalance_date(
+            initial_rebal_date_bl, all_prices_pivot, all_daily_returns, financial_data_full, classification_probs_full
+        )
+        historical_prices_for_bl_prior_init = all_prices_pivot[all_prices_pivot.index < initial_rebal_date_bl]
+
+        if not historical_prices_for_bl_prior_init.empty and len(historical_prices_for_bl_prior_init) >= 2:
+            try:
+                pi_prior_init_for_views = expected_returns.mean_historical_return(historical_prices_for_bl_prior_init, frequency=252)
+                pi_prior_init_for_views = pi_prior_init_for_views.reindex(asset_tickers_ordered).fillna(0)
+                
+                P_init, Q_init, Omega_init = black_litterman.generate_views_from_signals(
+                    asset_tickers_ordered, current_fin_data_init, current_class_probs_init, pi_prior_init_for_views, initial_rebal_date_bl
+                )
+                posterior_mu_initial, posterior_S_initial = black_litterman.get_black_litterman_posterior_estimates(
+                    historical_prices_for_bl_prior_init, asset_tickers_ordered, None, P_init, Q_init, Omega_init
+                )
+                if posterior_mu_initial is not None and not posterior_mu_initial.empty:
+                    target_weights_initial_bl = markowitz.optimize_markowitz_portfolio(posterior_mu_initial, posterior_S_initial)
+                    prices_initial_bl = all_prices_pivot.loc[initial_rebal_date_bl]
+                    if not prices_initial_bl.isnull().all():
+                        bl_backtester.rebalance(initial_rebal_date_bl, target_weights_initial_bl, prices_initial_bl)
+                        initial_investment_done_bl = True 
+                    else: # Fallback nếu giá NaN
+                        bl_backtester.portfolio_history.append({'date': initial_rebal_date_bl, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+                else: # Fallback nếu posterior mu/S rỗng
+                    bl_backtester.portfolio_history.append({'date': initial_rebal_date_bl, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+            except Exception as e_init_bl:
+                logger.error(f"Error during initial BL processing for {initial_rebal_date_bl.date()}: {e_init_bl}")
+                bl_backtester.portfolio_history.append({'date': initial_rebal_date_bl, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+        else:
+             logger.warning(f"Skipping BL initial rebalance on {initial_rebal_date_bl.date()} due to insufficient historical price data.")
+             bl_backtester.portfolio_history.append({'date': initial_rebal_date_bl, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+    elif not rebalance_dates.empty and actual_first_trading_day_in_pf_period == rebalance_dates[0]:
+        # Ngày rebalance đầu tiên trùng với ngày bắt đầu danh mục, sẽ được xử lý trong vòng lặp
+        pass
+    elif rebalance_dates.empty : # Không có ngày rebalance nào, nhưng vẫn cần entry đầu tiên nếu pf period có ngày
+        bl_backtester.portfolio_history.append({'date': actual_first_trading_day_in_pf_period, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+
+
+    # Vòng lặp tái cân bằng định kỳ
+    for rebal_date in rebalance_dates:
+        # Bỏ qua ngày đầu tiên nếu nó đã được xử lý ở trên và ngày đầu tiên đó chính là ngày rebalance đầu tiên
+        if initial_investment_done_bl and rebal_date == actual_first_trading_day_in_pf_period:
+             logger.info(f"Black-Litterman: Skipping rebalance for {rebal_date.date()} as it was handled as initial investment.")
+             continue
+
+        logger.info(f"Black-Litterman: Processing rebalance for {rebal_date.date()}...")
+
+        # 1. Lấy dữ liệu financial và classification probs cho views cho NGÀY REBAL_DATE HIỆN TẠI
+        _, _, current_fin_data, current_class_probs = data_preparation.get_prepared_data_for_rebalance_date(
+            rebal_date, # <<--- SỬA Ở ĐÂY: Dùng rebal_date hiện tại của vòng lặp
+            all_prices_pivot, 
+            all_daily_returns, 
+            financial_data_full, 
+            classification_probs_full
+        )
+
+        # 2. Lấy historical prices để tính S_prior và pi_prior cho BlackLittermanModel
+        #    Cần dữ liệu giá TRƯỚC rebal_date
+        historical_prices_for_bl_prior = all_prices_pivot[all_prices_pivot.index < rebal_date]
+        logger.debug(f"BL Rebal {rebal_date.date()}: Shape of historical_prices_for_bl_prior: {historical_prices_for_bl_prior.shape}")
+        if historical_prices_for_bl_prior.empty or len(historical_prices_for_bl_prior) < 2: # Cần ít nhất 2 dòng để tính return/cov
+            logger.warning(f"Skipping BL rebalance on {rebal_date.date()} due to insufficient historical price data for prior S/pi ({len(historical_prices_for_bl_prior)} rows).")
+            if bl_backtester.portfolio_history: last_entry = bl_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date; last_entry['returns'] = 0.0; bl_backtester.portfolio_history.append(last_entry)
+            elif not bl_backtester.portfolio_history and rebal_date == actual_first_trading_day_in_pf_period : bl_backtester.portfolio_history.append({'date': rebal_date, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+            continue
+        
+        logger.debug(f"BL Rebal {rebal_date.date()}: historical_prices_for_bl_prior HEAD:\n{historical_prices_for_bl_prior.head().to_string()}")
+        logger.debug(f"BL Rebal {rebal_date.date()}: historical_prices_for_bl_prior TAIL:\n{historical_prices_for_bl_prior.tail().to_string()}")
+        logger.debug(f"BL Rebal {rebal_date.date()}: Any NaN in historical_prices_for_bl_prior? {historical_prices_for_bl_prior.isnull().values.any()}")
+
+        # Tính pi_prior (market implied hoặc historical mean) - ĐÃ ANNUALIZE BÊN TRONG get_black_litterman_posterior_estimates
+        # Nếu không có market_caps, hàm get_black_litterman_posterior_estimates sẽ dùng historical mean
+        # Chúng ta cần truyền pi_prior (annualized) vào generate_views_from_signals nếu view phụ thuộc vào nó.
+        # Cách 1: Tính pi_prior ở đây trước.
+        # temp_S_prior_for_pi = risk_models.CovarianceShrinkage(historical_prices_for_bl_prior, frequency=252).ledoit_wolf()
+        try:
+            pi_prior_annual_for_views = expected_returns.mean_historical_return(historical_prices_for_bl_prior, frequency=252)
+            pi_prior_annual_for_views = pi_prior_annual_for_views.reindex(asset_tickers_ordered).fillna(0)
+            logger.debug(f"BL Rebal {rebal_date.date()}: pi_prior_annual_for_views (for views) HEAD:\n{pi_prior_annual_for_views.head().to_string()}")
+        except Exception as e_pi_calc:
+            logger.error(f"BL Rebal {rebal_date.date()}: Error calculating pi_prior_annual_for_views: {e_pi_calc}")
+            if bl_backtester.portfolio_history: last_entry = bl_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date; last_entry['returns'] = 0.0; bl_backtester.portfolio_history.append(last_entry)
+            elif not bl_backtester.portfolio_history : bl_backtester.portfolio_history.append({'date': rebal_date, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
             continue
 
-        target_weights_mw = markowitz.optimize_markowitz_portfolio(mu_annual, S_annual) # Truyền mu và S hàng năm
+        # 3. Tạo Views (P, Q, Omega)
+        P, Q, Omega = black_litterman.generate_views_from_signals(
+            asset_tickers_ordered, current_fin_data, current_class_probs, pi_prior_annual_for_views, rebal_date
+        )
+        
+        if P is not None:
+            logger.debug(f"BL Rebal {rebal_date.date()}: P matrix shape: {P.shape}, Q vector shape: {Q.shape if Q is not None else 'None'}, Omega matrix shape: {Omega.shape if Omega is not None else 'None'}")
+        else:
+            logger.info(f"BL Rebal {rebal_date.date()}: No views generated.")
+
+        # 4. Lấy posterior mu và S từ BlackLittermanModel
+        #    (Hàm này sẽ tự tính S_prior và pi_prior bên trong nó)
+        #    Market caps có thể để None, hàm sẽ fallback sang historical mean cho pi_prior
+        posterior_mu_annual, posterior_S_annual = black_litterman.get_black_litterman_posterior_estimates(
+            historical_prices_for_bl_prior,
+            asset_tickers_order=asset_tickers_ordered,
+            market_caps=None,
+            views_P=P,
+            views_Q=Q,
+            views_Omega=Omega
+        )
+
+        mu_fallback, S_fallback, _, _ = data_preparation.get_prepared_data_for_rebalance_date(rebal_date, all_prices_pivot, all_daily_returns, None, None)
+        if posterior_mu_annual is None or posterior_S_annual is None or posterior_mu_annual.empty or posterior_S_annual.empty:
+            logger.warning(f"Failed to get BL posterior estimates for {rebal_date.date()}. Attempting to use Markowitz with historical mean/cov as fallback for this period.")
+            if mu_fallback.empty or S_fallback.empty or mu_fallback.isnull().all() or S_fallback.isnull().all().all():
+                logger.error(f"Fallback Markowitz also failed for {rebal_date.date()} due to empty mu/S. Skipping rebalance.")
+                if bl_backtester.portfolio_history: last_entry = bl_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date; last_entry['returns'] = 0.0; bl_backtester.portfolio_history.append(last_entry)
+                elif not bl_backtester.portfolio_history and rebal_date == actual_first_trading_day_in_pf_period : bl_backtester.portfolio_history.append({'date': rebal_date, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+                continue
+            target_weights_bl = markowitz.optimize_markowitz_portfolio(mu_fallback, S_fallback)
+            logger.info(f"BL Rebal {rebal_date.date()}: Used Markowitz historical as fallback.")
+        else:
+        # 5. Tối ưu hóa danh mục bằng Markowitz optimizer với posterior estimates
+            target_weights_bl = markowitz.optimize_markowitz_portfolio(posterior_mu_annual, posterior_S_annual)
         
         prices_on_rebal_date = all_prices_pivot.loc[rebal_date]
-        if prices_on_rebal_date.isnull().all(): # Kiểm tra nếu tất cả giá là NaN
-            logger.warning(f"All prices are NaN on rebalance date {rebal_date.date()}. Skipping rebalance.")
-            if markowitz_backtester.portfolio_history:
-                last_entry = markowitz_backtester.portfolio_history[-1].copy()
-                last_entry['date'] = rebal_date
-                last_entry['returns'] = 0.0
-                markowitz_backtester.portfolio_history.append(last_entry)
-            elif not markowitz_backtester.portfolio_history and rebal_date == actual_first_trading_day_in_pf_period :
-                 markowitz_backtester.portfolio_history.append({'date': rebal_date, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+        if prices_on_rebal_date.isnull().all(): # ... (xử lý skip) ...
+            logger.warning(f"All prices NaN on BL rebalance {rebal_date.date()}. Skipping.")
+            if bl_backtester.portfolio_history: last_entry = bl_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date; last_entry['returns'] = 0.0; bl_backtester.portfolio_history.append(last_entry)
+            elif not bl_backtester.portfolio_history and rebal_date == actual_first_trading_day_in_pf_period : bl_backtester.portfolio_history.append({'date': rebal_date, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
             continue
+        bl_backtester.rebalance(rebal_date, target_weights_bl, prices_on_rebal_date)
 
-        markowitz_backtester.rebalance(rebal_date, target_weights_mw, prices_on_rebal_date)
-    
-    # Tạo DataFrame lịch sử từ list các dict
-    if markowitz_backtester.portfolio_history:
-        markowitz_history_df = pd.DataFrame(markowitz_backtester.portfolio_history).set_index('date')
-    else: # Nếu không có entry nào trong history (ví dụ mọi rebalance đều skip)
-        logger.error("Markowitz backtester history is empty. Cannot proceed.")
-        markowitz_history_df = pd.DataFrame(columns=['value', 'cash', 'returns', 'weights'])
-
-    # Sau vòng lặp rebalance, cập nhật giá trị hàng ngày
-    daily_markowitz_perf_df = update_portfolio_values_daily(markowitz_history_df, all_prices_pivot)
-
-    if daily_markowitz_perf_df is not None and not daily_markowitz_perf_df.empty and 'returns' in daily_markowitz_perf_df:
-        # Tạo một instance Backtester MỚI chỉ để gọi calculate_metrics,
-        # không làm thay đổi trạng thái của markowitz_backtester gốc dùng cho rebalancing.
-        # Hoặc làm cho calculate_metrics là một static method hoặc hàm riêng.
-        # Hiện tại, calculate_metrics trong class PortfolioBacktester đang dùng self.get_portfolio_performance_df()
-        # nên chúng ta cần truyền returns series cho nó.
-        metrics_calculator = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL) # Dummy instance
-        results_summary['Markowitz'] = metrics_calculator.calculate_metrics(
-            portfolio_returns_series=daily_markowitz_perf_df['returns'].fillna(0) # fillna ở đây cho chắc
-        )
-        all_portfolio_dfs['Markowitz'] = daily_markowitz_perf_df
-        try:
-            configs.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-            daily_markowitz_perf_df.to_csv(configs.RESULTS_DIR / "markowitz_performance_daily.csv")
-            logger.info(f"Markowitz daily performance saved to {configs.RESULTS_DIR / 'markowitz_performance_daily.csv'}")
-        except Exception as e_save:
-            logger.error(f"Error saving Markowitz performance: {e_save}")
-
-    else:
-        logger.error("Markowitz daily performance DataFrame is empty or missing 'returns' column after daily update.")
-
-
-    # --- (Thêm Chiến lược Black-Litterman ở đây sau khi Markowitz chạy ổn) ---
-    # ... Tương tự như Markowitz, nhưng gọi hàm BL ...
-
+    if bl_backtester.portfolio_history: bl_history_df = pd.DataFrame(bl_backtester.portfolio_history).set_index('date')
+    else: bl_history_df = pd.DataFrame(columns=['value', 'cash', 'returns', 'weights'])
+    daily_bl_perf_df = update_portfolio_values_daily(bl_history_df, all_prices_pivot)
+    if daily_bl_perf_df is not None and not daily_bl_perf_df.empty and 'returns' in daily_bl_perf_df:
+        metrics_calculator = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL)
+        results_summary['BlackLitterman'] = metrics_calculator.calculate_metrics(portfolio_returns_series=daily_bl_perf_df['returns'].fillna(0))
+        all_portfolio_dfs['BlackLitterman'] = daily_bl_perf_df
+        try: configs.RESULTS_DIR.mkdir(parents=True, exist_ok=True); daily_bl_perf_df.to_csv(configs.RESULTS_DIR / "blacklitterman_performance_daily.csv"); logger.info(f"BlackLitterman daily performance saved.")
+        except Exception as e_save_bl: logger.error(f"Error saving BlackLitterman performance: {e_save_bl}")
+    else: logger.error("BlackLitterman daily perf DF empty/missing returns.")
 
     # --- 4. Tổng hợp và In Kết quả ---
     if results_summary:
@@ -327,7 +444,6 @@ def run_portfolio_strategies():
 
     else:
         logger.info("No portfolio strategies were successfully backtested to generate a summary.")
-
 
 if __name__ == "__main__":
     run_portfolio_strategies()
