@@ -23,57 +23,88 @@ except ImportError as e:
 # Hoặc thiết lập một logger riêng nếu file này có thể chạy độc lập để test
 logger = logging.getLogger(__name__)
 
-def load_price_data_for_portfolio():
+def load_price_data_for_portfolio(
+    custom_start_date_str: str = None,
+    custom_end_date_str: str = None,
+    include_buffer_for_rolling: bool = True
+):
     """
     Load và pivot dữ liệu giá đã được enriched.
     Lọc theo ASSETS và khoảng thời gian cần thiết cho rolling calculations.
     """
-    logger.info(f"Loading price data for portfolio from: {configs.PRICE_DATA_FOR_PORTFOLIO_PATH}")
+    source_file = configs.PRICE_DATA_FOR_PORTFOLIO_PATH
+    log_message_prefix = "Tải dữ liệu giá"
+    if custom_start_date_str and custom_end_date_str:
+        log_message_prefix = f"Tải dữ liệu giá tùy chỉnh ({custom_start_date_str} - {custom_end_date_str})"
+    logger.info(f"{log_message_prefix} từ: {source_file}")
+
+
     try:
-        df_price_full = pd.read_csv(configs.PRICE_DATA_FOR_PORTFOLIO_PATH, parse_dates=['date'])
+        df_price_full = pd.read_csv(source_file, parse_dates=['date'])
     except FileNotFoundError:
-        logger.error(f"Price data file not found: {configs.PRICE_DATA_FOR_PORTFOLIO_PATH}")
+        logger.error(f"Tệp dữ liệu giá không tìm thấy: {source_file}")
         return pd.DataFrame()
 
-    # Chỉ giữ các cột cần thiết ban đầu
-    df_price = df_price_full[['date', 'ticker', 'close']].copy() # Thêm 'volume' nếu cần sau này
+    df_price = df_price_full[['date', 'ticker', 'close']].copy()
 
-    # Lọc theo danh sách ASSETS trong configs
     if configs.PORTFOLIO_ASSETS:
         df_price = df_price[df_price['ticker'].isin(configs.PORTFOLIO_ASSETS)].copy()
-        # Kiểm tra xem tất cả assets có trong dữ liệu không
         missing_assets = [asset for asset in configs.PORTFOLIO_ASSETS if asset not in df_price['ticker'].unique()]
         if missing_assets:
-            logger.warning(f"Assets not found in price data: {missing_assets}")
+            logger.warning(f"Các tài sản không tìm thấy trong dữ liệu giá: {missing_assets}")
 
-    # Xác định khoảng thời gian cần load (bao gồm cả dữ liệu lịch sử cho rolling)
-    # Lấy thêm dữ liệu trước PORTFOLIO_START_DATE để tính rolling covariance/returns
-    # Ví dụ: cần ít nhất ROLLING_WINDOW_COVARIANCE ngày trước đó
-    buffer_days = max(configs.ROLLING_WINDOW_COVARIANCE, configs.ROLLING_WINDOW_RETURNS) + 30 # Thêm buffer
-    # Chuyển đổi ngày bắt đầu và kết thúc sang datetime
-    portfolio_start_dt = pd.to_datetime(configs.PORTFOLIO_START_DATE)
-    portfolio_end_dt = pd.to_datetime(configs.PORTFOLIO_END_DATE)
+    # Xác định khoảng thời gian cần load
+    if custom_start_date_str and custom_end_date_str:
+        load_start_dt_config = pd.to_datetime(custom_start_date_str)
+        load_end_dt_config = pd.to_datetime(custom_end_date_str)
+        if include_buffer_for_rolling:
+            # Buffer cho custom range, ví dụ, đủ cho RL_LOOKBACK_WINDOW_SIZE
+            # Hoặc một buffer chung nhỏ hơn
+            buffer_days_custom = configs.RL_LOOKBACK_WINDOW_SIZE + 15 # Thêm 15 ngày làm việc buffer
+            load_start_dt = load_start_dt_config - pd.DateOffset(days=buffer_days_custom)
+            load_end_dt = load_end_dt_config # Không thêm buffer vào ngày kết thúc của custom range
+        else:
+            load_start_dt = load_start_dt_config
+            load_end_dt = load_end_dt_config
+    else: # Sử dụng ngày từ config cho portfolio backtest (Markowitz, BL)
+        load_start_dt_config = pd.to_datetime(configs.PORTFOLIO_START_DATE)
+        load_end_dt_config = pd.to_datetime(configs.PORTFOLIO_END_DATE)
+        if include_buffer_for_rolling:
+            buffer_days = max(configs.ROLLING_WINDOW_COVARIANCE, configs.ROLLING_WINDOW_RETURNS) + 30
+            load_start_dt = load_start_dt_config - pd.DateOffset(days=buffer_days * 1.5) # Nhân 1.5 để đảm bảo có đủ ngày làm việc
+        else:
+            load_start_dt = load_start_dt_config
+        load_end_dt = load_end_dt_config
+
+    # Đảm bảo load_start_date không sớm hơn dữ liệu có sẵn từ file gốc nếu cần
+    # Điều này quan trọng nếu TIME_RANGE_START của bạn là ngày cụ thể
+    # và bạn không muốn load dữ liệu trước ngày đó ngay cả khi buffer yêu cầu.
+    min_available_date_overall = pd.to_datetime(configs.TIME_RANGE_START)
+    load_start_dt = max(load_start_dt, min_available_date_overall)
     
-    load_start_date = portfolio_start_dt - pd.DateOffset(days=buffer_days * 1.5) # Nhân 1.5 để đảm bảo đủ ngày làm việc
-    # Đảm bảo load_start_date không sớm hơn dữ liệu có sẵn
-    min_available_date = pd.to_datetime(configs.TIME_RANGE_START)
-    load_start_date = max(load_start_date, min_available_date)
+    # Lọc theo ngày
+    df_price_filtered = df_price[(df_price['date'] >= load_start_dt) & (df_price['date'] <= load_end_dt)].copy()
 
-    df_price = df_price[(df_price['date'] >= load_start_date) & (df_price['date'] <= portfolio_end_dt)].copy()
-
-    if df_price.empty:
-        logger.error("No price data found after filtering by date and assets.")
+    if df_price_filtered.empty:
+        logger.error(f"Không có dữ liệu giá sau khi lọc theo ngày ({load_start_dt.date()} - {load_end_dt.date()}) và tài sản.")
         return pd.DataFrame()
 
-    # Pivot để mỗi cột là một ticker, index là date (dùng cho giá đóng cửa)
-    df_price_pivot = df_price.pivot(index='date', columns='ticker', values='close')
+    df_price_pivot = df_price_filtered.pivot(index='date', columns='ticker', values='close')
     
-    # Fill NaN bằng ffill rồi bfill để xử lý các ngày nghỉ ngẫu nhiên của từng mã
-    df_price_pivot = df_price_pivot.ffill().bfill()
-    # Sau đó drop các cột (tickers) mà vẫn còn toàn NaN (nếu có mã không có dữ liệu nào)
+    # Fill NaN: ffill trước để lấp các ngày nghỉ lễ, sau đó bfill để lấp các giá trị NaN ở đầu nếu có
+    # Quan trọng: Nếu một mã không có dữ liệu ở đầu khoảng thời gian, bfill có thể kéo dữ liệu từ tương lai về.
+    # Cân nhắc kỹ hơn về chiến lược fillna. ffill() là phổ biến.
+    df_price_pivot = df_price_pivot.ffill()
+    # Có thể drop các cột toàn NaN sau ffill nếu một mã không có dữ liệu nào trong toàn bộ khoảng đã lọc
     df_price_pivot.dropna(axis=1, how='all', inplace=True)
+    # bfill sau đó có thể hữu ích nếu vẫn còn NaN ở đầu cho một số mã cụ thể, nhưng cần cẩn thận
+    # df_price_pivot = df_price_pivot.bfill()
 
-    logger.info(f"Price data loaded and pivoted. Shape: {df_price_pivot.shape}")
+
+    logger.info(f"Dữ liệu giá cho '{'custom range' if custom_start_date_str else 'portfolio backtest'}' đã tải và pivot. "
+                f"Shape: {df_price_pivot.shape}. "
+                f"Từ: {df_price_pivot.index.min().date() if not df_price_pivot.empty else 'N/A'} "
+                f"Đến: {df_price_pivot.index.max().date() if not df_price_pivot.empty else 'N/A'}")
     return df_price_pivot
 
 def load_financial_data_for_portfolio():

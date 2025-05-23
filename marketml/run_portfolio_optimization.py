@@ -4,6 +4,7 @@ import numpy as np
 from pathlib import Path
 import sys
 import logging
+import joblib
 
 # ===== THÊM THƯ MỤC GỐC VÀO PATH =====
 # Giả sử script này nằm trong .ndmh/marketml/
@@ -13,9 +14,11 @@ sys.path.insert(0, str(PROJECT_ROOT_SCRIPT))
 # === IMPORT MODULES ===
 try:
     from marketml.configs import configs
-    from marketml.log import setup # Giả sử bạn đã đặt environment_setup.py thành setup.py trong log
+    from marketml.log import setup
     from marketml.portfolio_opt import data_preparation, markowitz, black_litterman, backtesting
+    from marketml.portfolio_opt import rl_environment, rl_optimizer # THÊM IMPORT RL
     from pypfopt import risk_models, expected_returns
+    from stable_baselines3 import PPO, A2C # THÊM IMPORT CHO TẢI MODEL RL
 except ImportError as e:
     print(f"CRITICAL ERROR in run_portfolio_optimization.py: Could not import necessary modules. {e}")
     sys.exit(1)
@@ -168,32 +171,89 @@ def update_portfolio_values_daily(rebalance_history_df, all_prices_pivot):
 
 def run_portfolio_strategies():
     logger.info("Starting portfolio optimization backtest...")
-
-    # --- 0. Kiểm tra hoặc Tạo Soft Signals ---
     generate_classification_signals_if_needed()
 
-    # --- 1. Load và Chuẩn bị Dữ liệu Tổng Thể ---
-    logger.info("Loading and preparing master data for portfolio optimization run...")
-    all_prices_pivot = data_preparation.load_price_data_for_portfolio()
-    if all_prices_pivot.empty: logger.error("Price data is empty. Exiting."); return
-    
-    # Loại bỏ các cột/tickers mà không có dữ liệu giá trong toàn bộ khoảng thời gian backtest
-    portfolio_period_prices = all_prices_pivot.loc[pd.to_datetime(configs.PORTFOLIO_START_DATE):pd.to_datetime(configs.PORTFOLIO_END_DATE)]
-    valid_tickers_in_period = portfolio_period_prices.dropna(axis=1, how='all').columns
-    
-    if len(valid_tickers_in_period) == 0: logger.error(f"No valid tickers in portfolio period. Exiting."); return
-    if len(valid_tickers_in_period) < len(all_prices_pivot.columns):
-        logger.warning(f"Using subset of tickers: {valid_tickers_in_period.tolist()}")
-        all_prices_pivot = all_prices_pivot[valid_tickers_in_period]
-        if all_prices_pivot.empty: logger.error("Price data empty after subsetting. Exiting."); return
+    # --- 1A. TẢI DỮ LIỆU GIÁ BAN ĐẦU CHO HUẤN LUYỆN RL (NẾU CẦN) ---
+    prices_df_for_rl_training_loaded_at_start = pd.DataFrame()
+    if configs.RL_STRATEGY_ENABLED:
+        logger.info("Đang tải dữ liệu giá ban đầu cho huấn luyện RL...")
+        prices_df_for_rl_training_loaded_at_start = data_preparation.load_price_data_for_portfolio(
+            custom_start_date_str=configs.RL_TRAIN_DATA_START_DATE,
+            custom_end_date_str=configs.RL_TRAIN_DATA_END_DATE,
+            include_buffer_for_rolling=True
+        )
 
-    all_daily_returns = data_preparation.calculate_returns(all_prices_pivot)
-    if all_daily_returns.empty: logger.error("Daily returns are empty. Exiting."); return
-    
+    # --- 1B. TẢI VÀ CHUẨN BỊ DỮ LIỆU CHUNG CHO BACKTEST VÀ CÁC CHIẾN LƯỢC KHÁC ---
+    logger.info("Đang tải và chuẩn bị dữ liệu chung cho backtest...")
+    # all_prices_pivot này sẽ được dùng cho Markowitz, BL, và làm cơ sở cho inference env của RL
+    all_prices_pivot_for_backtest_raw = data_preparation.load_price_data_for_portfolio()
+    if all_prices_pivot_for_backtest_raw.empty:
+        logger.error("Dữ liệu giá cho backtest rỗng. Đang thoát."); return
+
+    # Dữ liệu đầy đủ, KHÔNG LỌC TICKERS ở đây cho Markowitz/BL
+    financial_data_full_master_unfiltered = data_preparation.load_financial_data_for_portfolio()
+    classification_probs_full_master_unfiltered = data_preparation.load_classification_probabilities()
+
+    # Tải financial và classification data đầy đủ một lần
     financial_data_full = data_preparation.load_financial_data_for_portfolio()
     classification_probs_full = data_preparation.load_classification_probabilities()
 
+    # --- 1C. XÁC ĐỊNH VALID TICKERS VÀ LỌC DỮ LIỆU CHUNG ---
+    portfolio_period_prices = all_prices_pivot_for_backtest_raw.loc[
+        pd.to_datetime(configs.PORTFOLIO_START_DATE):pd.to_datetime(configs.PORTFOLIO_END_DATE)
+    ]
+    valid_tickers_in_period = portfolio_period_prices.dropna(axis=1, how='all').columns.tolist()
+
+    if not valid_tickers_in_period:
+        logger.error(f"Không có tickers hợp lệ trong giai đoạn portfolio. Đang thoát."); return
+
+    logger.info(f"Tickers hợp lệ cho giai đoạn backtest ({len(valid_tickers_in_period)}): {valid_tickers_in_period}")
+
+    # Lọc all_prices_pivot_for_backtest_raw
+    all_prices_pivot = all_prices_pivot_for_backtest_raw[valid_tickers_in_period].copy()
+    if all_prices_pivot.empty:
+        logger.error("Dữ liệu giá cho backtest rỗng sau khi lọc tickers. Đang thoát."); return
+
+    # Lọc prices_df_for_rl_training_loaded_at_start (nếu nó không rỗng)
+    if not prices_df_for_rl_training_loaded_at_start.empty:
+        common_tickers_for_rl_train = [t for t in valid_tickers_in_period if t in prices_df_for_rl_training_loaded_at_start.columns]
+        if not common_tickers_for_rl_train:
+            logger.warning("Không có tickers chung giữa dữ liệu huấn luyện RL và giai đoạn backtest. Dữ liệu huấn luyện RL sẽ rỗng.")
+            prices_df_for_rl_training_filtered = pd.DataFrame()
+        else:
+            prices_df_for_rl_training_filtered = prices_df_for_rl_training_loaded_at_start[common_tickers_for_rl_train].copy()
+        logger.info(f"Dữ liệu giá huấn luyện RL sau khi lọc theo valid tickers: {len(prices_df_for_rl_training_filtered)} hàng, {prices_df_for_rl_training_filtered.shape[1]} tickers.")
+    else:
+        prices_df_for_rl_training_filtered = pd.DataFrame() # Đảm bảo nó được định nghĩa
+
+    # Lọc financial_data_full và classification_probs_full theo valid_tickers_in_period
+    # Điều này làm cho các DataFrame này nhỏ hơn và chỉ chứa dữ liệu liên quan.
+    if not financial_data_full.empty and 'Ticker' in financial_data_full.columns: # Giả sử tên cột là 'Ticker'
+        financial_data_full_filtered = financial_data_full[financial_data_full['Ticker'].isin(valid_tickers_in_period)].copy()
+    else:
+        financial_data_full_filtered = financial_data_full # Hoặc pd.DataFrame() nếu rỗng
+
+    if not classification_probs_full.empty and 'ticker' in classification_probs_full.columns:
+        classification_probs_full_filtered = classification_probs_full[classification_probs_full['ticker'].isin(valid_tickers_in_period)].copy()
+    else:
+        classification_probs_full_filtered = classification_probs_full # Hoặc pd.DataFrame()
+
+    all_daily_returns = data_preparation.calculate_returns(all_prices_pivot)
+    if all_daily_returns.empty:
+        logger.error("Lợi nhuận hàng ngày cho backtest rỗng. Đang thoát."); return
+
+    # --- 1D. CHUẨN BỊ DỮ LIỆU GIÁ ĐÃ LỌC TICKERS CHO HUẤN LUYỆN RL ---
+    prices_df_for_rl_training_final_filtered_tickers = pd.DataFrame()
+    if configs.RL_STRATEGY_ENABLED and not prices_df_for_rl_training_loaded_at_start.empty:
+        common_tickers_for_rl_train = [t for t in valid_tickers_in_period if t in prices_df_for_rl_training_loaded_at_start.columns]
+        if not common_tickers_for_rl_train:
+            logger.warning("Không có tickers chung giữa dữ liệu huấn luyện RL và backtest. Dữ liệu giá huấn luyện RL sẽ rỗng.")
+        else:
+            prices_df_for_rl_training_final_filtered_tickers = prices_df_for_rl_training_loaded_at_start[common_tickers_for_rl_train].copy()
+        logger.info(f"Dữ liệu giá huấn luyện RL sau khi lọc theo valid tickers: {len(prices_df_for_rl_training_final_filtered_tickers)} hàng, {prices_df_for_rl_training_final_filtered_tickers.shape[1]} tickers.")
+        
     # --- 2. Xác định Ngày Tái Cân Bằng ---
+    asset_tickers_ordered = all_prices_pivot.columns.tolist()
     trading_days = all_prices_pivot.loc[pd.to_datetime(configs.PORTFOLIO_START_DATE):pd.to_datetime(configs.PORTFOLIO_END_DATE)].index
     if trading_days.empty: logger.error("No trading days in portfolio period. Exiting."); return
 
@@ -426,6 +486,293 @@ def run_portfolio_strategies():
         try: configs.RESULTS_DIR.mkdir(parents=True, exist_ok=True); daily_bl_perf_df.to_csv(configs.RESULTS_DIR / "blacklitterman_performance_daily.csv"); logger.info(f"BlackLitterman daily performance saved.")
         except Exception as e_save_bl: logger.error(f"Error saving BlackLitterman performance: {e_save_bl}")
     else: logger.error("BlackLitterman daily perf DF empty/missing returns.")
+
+    # --- Reinforcement Learning Strategy ---
+    if configs.RL_STRATEGY_ENABLED:
+        logger.info("\n--- Đang chạy Chiến lược Học Tăng Cường ---")
+        configs.RL_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+        configs.RL_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+        trained_rl_model = None
+        fin_means_for_inference = None
+        fin_stds_for_inference = None
+        scaler_path = configs.RL_MODEL_DIR / "financial_scalers.joblib"
+
+        # 1. CỐ GẮNG TẢI MODEL VÀ SCALERS
+        model_path_to_load_base = configs.RL_MODEL_DIR
+        best_model_path = model_path_to_load_base / "best_model" / "best_model.zip"
+        final_model_path_from_config = configs.RL_MODEL_SAVE_PATH
+
+        model_to_try_load = None
+        if best_model_path.exists(): model_to_try_load = best_model_path
+        elif final_model_path_from_config.exists(): model_to_try_load = final_model_path_from_config
+
+        # 2. NẾU CẦN, HUẤN LUYỆN LẠI MODEL
+        # Điều kiện huấn luyện lại: model chưa được tải HOẶC financial features được dùng mà scalers không có
+        condition_to_retrain = trained_rl_model is None
+        if configs.RL_FINANCIAL_FEATURES and (fin_means_for_inference is None or fin_stds_for_inference is None):
+            if trained_rl_model is not None: logger.warning("Model RL đã tải nhưng thiếu financial scalers. Sẽ huấn luyện lại.")
+            condition_to_retrain = True
+            trained_rl_model = None
+
+        if condition_to_retrain:
+            logger.info("Đang chuẩn bị dữ liệu và huấn luyện mô hình RL mới.")
+            # prices_df_for_rl_training_final_filtered đã được chuẩn bị ở phần 1D
+            if prices_df_for_rl_training_final_filtered_tickers.empty or \
+               len(prices_df_for_rl_training_final_filtered_tickers) < configs.RL_LOOKBACK_WINDOW_SIZE + configs.RL_REBALANCE_FREQUENCY_DAYS + 1 or \
+               prices_df_for_rl_training_final_filtered_tickers.shape[1] == 0:
+                 logger.error(f"Không đủ dữ liệu giá cho huấn luyện RL. Bỏ qua huấn luyện.")
+            else:
+                # Chuẩn bị financial và classification data cho huấn luyện RL,
+                # lọc từ BẢN GỐC (master_unfiltered) theo tickers và dates của prices_df_for_rl_training_final_filtered
+                financial_data_for_rl_train_slice = pd.DataFrame()
+                classification_probs_for_rl_train_slice = pd.DataFrame()
+                
+                rl_train_slice_tickers = prices_df_for_rl_training_final_filtered_tickers.columns.tolist()
+                rl_train_slice_start_date = prices_df_for_rl_training_final_filtered_tickers.index.min()
+                rl_train_slice_end_date = prices_df_for_rl_training_final_filtered_tickers.index.max()
+
+                if not financial_data_full_master_unfiltered.empty:
+                    if 'date' in financial_data_full_master_unfiltered.columns:
+                        financial_data_for_rl_train_slice = financial_data_full_master_unfiltered[
+                            (financial_data_full_master_unfiltered['ticker'].isin(rl_train_slice_tickers)) &
+                            (financial_data_full_master_unfiltered['date'] >= rl_train_slice_start_date) &
+                            (financial_data_full_master_unfiltered['date'] <= rl_train_slice_end_date)
+                        ].copy()
+                    elif 'Year' in financial_data_full_master_unfiltered.columns and 'Ticker' in financial_data_full_master_unfiltered.columns:
+                        start_year_rl_s = rl_train_slice_start_date.year
+                        end_year_rl_s = rl_train_slice_end_date.year
+                        financial_data_for_rl_train_slice = financial_data_full_master_unfiltered[
+                            (financial_data_full_master_unfiltered['Ticker'].isin(rl_train_slice_tickers)) &
+                            (financial_data_full_master_unfiltered['Year'] >= start_year_rl_s - 1) &
+                            (financial_data_full_master_unfiltered['Year'] <= end_year_rl_s)
+                        ].copy()
+                    logger.info(f"Dữ liệu tài chính cho huấn luyện RL (slice): {len(financial_data_for_rl_train_slice)} hàng.")
+
+                if not classification_probs_full_master_unfiltered.empty:
+                    classification_probs_for_rl_train_slice = classification_probs_full_master_unfiltered[
+                        (classification_probs_full_master_unfiltered['ticker'].isin(rl_train_slice_tickers)) &
+                        (classification_probs_full_master_unfiltered['date'] >= rl_train_slice_start_date) &
+                        (classification_probs_full_master_unfiltered['date'] <= rl_train_slice_end_date)
+                    ].copy()
+                    logger.info(f"Dữ liệu xác suất cho huấn luyện RL (slice): {len(classification_probs_for_rl_train_slice)} hàng.")
+                
+                trained_rl_model = rl_optimizer.train_rl_agent(
+                    prices_df_train=prices_df_for_rl_training_final_filtered_tickers,
+                    financial_data_train=financial_data_for_rl_train_slice,
+                    classification_probs_train=classification_probs_for_rl_train_slice,
+                    financial_features_list=configs.RL_FINANCIAL_FEATURES,
+                    prob_features_list=configs.RL_PROB_FEATURES,
+                    model_save_path=configs.RL_MODEL_SAVE_PATH,
+                    initial_capital=configs.INITIAL_CAPITAL,
+                    transaction_cost_bps=configs.RL_TRANSACTION_COST_BPS,
+                    lookback_window_size=configs.RL_LOOKBACK_WINDOW_SIZE,
+                    rebalance_frequency_days=configs.RL_REBALANCE_FREQUENCY_DAYS,
+                    total_timesteps=configs.RL_TOTAL_TIMESTEPS,
+                    rl_algorithm=configs.RL_ALGORITHM,# train_rl_agent sẽ dùng thư mục cha của path này để lưu scaler
+                    log_dir=configs.RL_LOG_DIR,
+                    # ... (truyền các siêu tham số PPO và reward shaping từ configs) ...
+                )
+                # SAU KHI HUẤN LUYỆN, TẢI LẠI SCALERS VỪA ĐƯỢC LƯU ĐỂ DÙNG CHO INFERENCE
+                if trained_rl_model and scaler_path.exists():
+                    try:
+                        scalers = joblib.load(scaler_path)
+                        fin_means_for_inference = scalers['means']
+                        fin_stds_for_inference = scalers['stds']
+                        logger.info(f"Đã tải financial scalers (sau huấn luyện) từ {scaler_path} để dùng cho inference.")
+                    except Exception as e_load_scaler_after_train:
+                        logger.error(f"Lỗi khi tải financial scalers sau huấn luyện: {e_load_scaler_after_train}")
+                elif trained_rl_model:
+                     logger.warning(f"Mô hình RL vừa được huấn luyện nhưng không tìm thấy file scaler tại {scaler_path}.")
+
+
+        if trained_rl_model is None:
+            logger.error("Mô hình RL không thể được tải hoặc huấn luyện. Bỏ qua backtest RL.")
+        else:
+            # --- 2. Backtest với Tác nhân đã Huấn luyện ---
+            rl_backtester = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL, configs.TRANSACTION_COST_BPS)
+            
+            # Chuẩn bị financial_data và classification_probs cho giai đoạn BACKTEST (sử dụng all_prices_pivot)
+            financial_data_for_rl_inference = pd.DataFrame()
+            classification_probs_for_rl_inference = pd.DataFrame()
+            # all_prices_pivot là DataFrame giá cho giai đoạn backtest
+            if not financial_data_full.empty and not all_prices_pivot.empty:
+                actual_inference_start_dt = all_prices_pivot.index.min()
+                actual_inference_end_dt = all_prices_pivot.index.max()
+                inference_tickers = all_prices_pivot.columns.tolist()
+
+                if 'date' in financial_data_full.columns:
+                    financial_data_for_rl_inference = financial_data_full[
+                        (financial_data_full['ticker'].isin(inference_tickers)) & # Lọc theo ticker của all_prices_pivot
+                        (financial_data_full['date'] >= actual_inference_start_dt) &
+                        (financial_data_full['date'] <= actual_inference_end_dt)
+                    ].copy()
+                elif 'Year' in financial_data_full.columns and 'Ticker' in financial_data_full.columns:
+                    start_year_bt = actual_inference_start_dt.year
+                    end_year_bt = actual_inference_end_dt.year
+                    financial_data_for_rl_inference = financial_data_full[
+                        (financial_data_full['Ticker'].isin(inference_tickers)) &
+                        (financial_data_full['Year'] >= start_year_bt - 1) &
+                        (financial_data_full['Year'] <= end_year_bt)
+                    ].copy()
+            
+            if not classification_probs_full.empty and not all_prices_pivot.empty:
+                actual_inference_start_dt = all_prices_pivot.index.min()
+                actual_inference_end_dt = all_prices_pivot.index.max()
+                inference_tickers = all_prices_pivot.columns.tolist()
+                classification_probs_for_rl_inference = classification_probs_full[
+                    (classification_probs_full['ticker'].isin(inference_tickers)) &
+                    (classification_probs_full['date'] >= actual_inference_start_dt) &
+                    (classification_probs_full['date'] <= actual_inference_end_dt)
+                ].copy()
+
+            logger.info(f"Dữ liệu tài chính cho inference RL: {len(financial_data_for_rl_inference)} hàng.")
+            logger.info(f"Dữ liệu xác suất cho inference RL: {len(classification_probs_for_rl_inference)} hàng.")
+            if fin_means_for_inference is None or fin_stds_for_inference is None:
+                 logger.warning("fin_means_for_inference hoặc fin_stds_for_inference là None. Đặc trưng tài chính sẽ không được chuẩn hóa đúng cách trong inference.")
+
+
+            inference_env_kwargs = {
+                'prices_df': all_prices_pivot, # Dữ liệu giá cho backtest
+                'financial_data': financial_data_for_rl_inference,
+                'classification_probs': classification_probs_for_rl_inference,
+                'initial_capital': configs.INITIAL_CAPITAL,
+                'transaction_cost_bps': configs.RL_TRANSACTION_COST_BPS, # Có thể dùng TRANSACTION_COST_BPS thông thường
+                'lookback_window_size': configs.RL_LOOKBACK_WINDOW_SIZE,
+                'rebalance_frequency_days': 1, # Không quan trọng cho việc chỉ get_state
+                'financial_features': configs.RL_FINANCIAL_FEATURES,
+                'prob_features': configs.RL_PROB_FEATURES,
+                'financial_feature_means': fin_means_for_inference, # ĐÃ TẢI HOẶC TÍNH TỪ HUẤN LUYỆN
+                'financial_feature_stds': fin_stds_for_inference   # ĐÃ TẢI HOẶC TÍNH TỪ HUẤN LUYỆN
+            }
+            temp_rl_env_for_state = rl_environment.PortfolioEnv(**inference_env_kwargs)
+            
+            current_rl_weights_for_state_input = np.zeros(temp_rl_env_for_state.num_assets + 1)
+            current_rl_weights_for_state_input[-1] = 1.0
+
+            # Xử lý initial rebalance
+            target_date_for_state = actual_first_trading_day_in_pf_period
+            try:
+                date_series_for_lookup = temp_rl_env_for_state.prices_df.index
+                # Tìm ngày giao dịch thực tế trong index, trước hoặc bằng target_date
+                idx_pos = date_series_for_lookup.searchsorted(target_date_for_state, side='right') - 1
+                if idx_pos < 0 : # Nếu target_date sớm hơn tất cả các ngày có trong index
+                    # Thử lấy ngày đầu tiên có thể nếu lookback cho phép
+                    if configs.RL_LOOKBACK_WINDOW_SIZE < len(date_series_for_lookup):
+                        idx_for_state_in_temp_env = configs.RL_LOOKBACK_WINDOW_SIZE
+                    else: # Không đủ dữ liệu ngay cả cho ngày đầu tiên + lookback
+                        raise IndexError(f"Không đủ dữ liệu lịch sử trong all_prices_pivot để bắt đầu RL backtest tại {target_date_for_state}.")
+                else:
+                    idx_for_state_in_temp_env = idx_pos
+                
+                actual_date_used = date_series_for_lookup[idx_for_state_in_temp_env]
+                logger.info(f"RL Initial State: Target date {target_date_for_state.date()}, Actual date used for state {actual_date_used.date()}")
+
+                if idx_for_state_in_temp_env < configs.RL_LOOKBACK_WINDOW_SIZE:
+                     logger.warning(f"Không đủ lịch sử nhìn lại ({configs.RL_LOOKBACK_WINDOW_SIZE} ngày) cho trạng thái RL ban đầu vào ngày {actual_date_used.date()}. "
+                                    f"Có {idx_for_state_in_temp_env +1 if idx_for_state_in_temp_env >=0 else 0} điểm dữ liệu lịch sử.")
+                
+                temp_rl_env_for_state._current_prices_idx = idx_for_state_in_temp_env
+                temp_rl_env_for_state.current_weights = current_rl_weights_for_state_input 
+                temp_rl_env_for_state.portfolio_value = configs.INITIAL_CAPITAL
+                
+                current_obs_for_rl = temp_rl_env_for_state._get_state()
+                predicted_raw_weights_rl_action = rl_optimizer.predict_rl_weights(trained_rl_model, current_obs_for_rl)
+
+                if predicted_raw_weights_rl_action is None:
+                    logger.error(f"RL: Không thể dự đoán tỷ trọng ban đầu. Bắt đầu bằng tiền mặt.")
+                    target_weights_rl_assets_only = {}
+                else:
+                    target_weights_rl_assets_only = {
+                        ticker: predicted_raw_weights_rl_action[i]
+                        for i, ticker in enumerate(temp_rl_env_for_state.tickers)
+                    }
+                
+                prices_initial_rl = all_prices_pivot.loc[actual_date_used] # Sử dụng actual_date_used để lấy giá
+                if not prices_initial_rl.isnull().all():
+                    rl_backtester.rebalance(actual_date_used, target_weights_rl_assets_only, prices_initial_rl) # Rebalance vào actual_date_used
+                    if predicted_raw_weights_rl_action is not None:
+                        current_rl_weights_for_state_input = predicted_raw_weights_rl_action.copy()
+                else:
+                    logger.warning(f"Tất cả giá đều NaN trong lần tái cân bằng RL ban đầu {actual_date_used.date()}. Bắt đầu bằng tiền mặt.")
+                    rl_backtester.portfolio_history.append({'date': actual_date_used, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+            
+            except IndexError as e_idx_init: # Bắt lỗi từ searchsorted nếu idx_pos < 0 và không xử lý được
+                 logger.error(f"Lỗi IndexError khi thiết lập trạng thái RL ban đầu gần {target_date_for_state}: {e_idx_init}. Bắt đầu bằng tiền mặt.")
+                 rl_backtester.portfolio_history.append({'date': target_date_for_state, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+            except Exception as e_init_rl:
+                 logger.error(f"Lỗi không xác định khi thiết lập trạng thái RL ban đầu gần {target_date_for_state}: {e_init_rl}. Bắt đầu bằng tiền mặt.", exc_info=True)
+                 rl_backtester.portfolio_history.append({'date': target_date_for_state, 'value': configs.INITIAL_CAPITAL, 'weights': {}, 'cash': configs.INITIAL_CAPITAL, 'returns': 0.0})
+
+
+            for rebal_date_target in rebalance_dates: # rebalance_dates là các ngày mục tiêu
+                logger.info(f"Chiến lược RL: Đang xử lý tái cân bằng cho ngày mục tiêu {rebal_date_target.date()}...")
+                try:
+                    date_series_for_lookup = temp_rl_env_for_state.prices_df.index
+                    idx_pos = date_series_for_lookup.searchsorted(rebal_date_target, side='right') - 1
+                    if idx_pos < 0:
+                        logger.warning(f"Không tìm thấy ngày giao dịch phù hợp cho state trước hoặc bằng {rebal_date_target.date()}. Bỏ qua rebalance này.")
+                        if rl_backtester.portfolio_history: last_entry = rl_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date_target; last_entry['returns'] = 0.0; rl_backtester.portfolio_history.append(last_entry)
+                        continue
+                    
+                    actual_rebal_date_for_state = date_series_for_lookup[idx_pos]
+                    idx_for_state_in_temp_env = idx_pos
+                    logger.info(f"RL Rebalance State: Target date {rebal_date_target.date()}, Actual date used for state & rebalance {actual_rebal_date_for_state.date()}")
+                    
+                    if idx_for_state_in_temp_env < configs.RL_LOOKBACK_WINDOW_SIZE:
+                        logger.warning(f"Không đủ lịch sử nhìn lại ({configs.RL_LOOKBACK_WINDOW_SIZE} ngày) cho trạng thái RL vào ngày {actual_rebal_date_for_state.date()}. "
+                                       f"Có {idx_for_state_in_temp_env +1 if idx_for_state_in_temp_env >=0 else 0} điểm dữ liệu lịch sử.")
+                    
+                    temp_rl_env_for_state._current_prices_idx = idx_for_state_in_temp_env
+                    last_hist_entry = rl_backtester.portfolio_history[-1] if rl_backtester.portfolio_history else None
+                    if last_hist_entry: temp_rl_env_for_state.portfolio_value = last_hist_entry['value']
+                    else: temp_rl_env_for_state.portfolio_value = configs.INITIAL_CAPITAL
+                    temp_rl_env_for_state.current_weights = current_rl_weights_for_state_input
+                    
+                    current_obs_for_rl = temp_rl_env_for_state._get_state()
+                    predicted_raw_weights_rl_action = rl_optimizer.predict_rl_weights(trained_rl_model, current_obs_for_rl)
+                    
+                    if predicted_raw_weights_rl_action is None:
+                        logger.error(f"RL: Không thể dự đoán tỷ trọng cho {actual_rebal_date_for_state.date()}. Giữ nguyên danh mục.")
+                        if rl_backtester.portfolio_history: last_entry = rl_backtester.portfolio_history[-1].copy(); last_entry['date'] = actual_rebal_date_for_state; last_entry['returns'] = 0.0; rl_backtester.portfolio_history.append(last_entry)
+                        continue
+
+                    target_weights_rl_assets_only = {
+                        ticker: predicted_raw_weights_rl_action[i]
+                        for i, ticker in enumerate(temp_rl_env_for_state.tickers)
+                    }
+
+                    prices_on_rebal_date = all_prices_pivot.loc[actual_rebal_date_for_state] # Dùng actual_rebal_date_for_state
+                    if prices_on_rebal_date.isnull().all():
+                        logger.warning(f"Tất cả giá đều NaN trong lần tái cân bằng RL {actual_rebal_date_for_state.date()}. Bỏ qua tái cân bằng bằng cách giữ nguyên.")
+                        if rl_backtester.portfolio_history: last_entry = rl_backtester.portfolio_history[-1].copy(); last_entry['date'] = actual_rebal_date_for_state; last_entry['returns'] = 0.0; rl_backtester.portfolio_history.append(last_entry)
+                        continue
+
+                    rl_backtester.rebalance(actual_rebal_date_for_state, target_weights_rl_assets_only, prices_on_rebal_date) # Rebalance vào actual_rebal_date_for_state
+                    current_rl_weights_for_state_input = predicted_raw_weights_rl_action.copy()
+
+                except IndexError as e_idx_rebal:
+                     logger.error(f"Lỗi IndexError khi lấy ngày cho trạng thái RL gần {rebal_date_target.date()}: {e_idx_rebal}. Giữ nguyên trạng thái trước đó.")
+                     if rl_backtester.portfolio_history: last_entry = rl_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date_target; last_entry['returns'] = 0.0; rl_backtester.portfolio_history.append(last_entry)
+                     continue
+                except Exception as e_rl_rebal:
+                    logger.error(f"Lỗi không xác định trong quá trình tái cân bằng RL cho {rebal_date_target.date()}: {e_rl_rebal}", exc_info=True)
+                    if rl_backtester.portfolio_history: last_entry = rl_backtester.portfolio_history[-1].copy(); last_entry['date'] = rebal_date_target; last_entry['returns'] = 0.0; rl_backtester.portfolio_history.append(last_entry)
+                    continue
+
+                if rl_backtester.portfolio_history:
+                    rl_history_df = pd.DataFrame(rl_backtester.portfolio_history).set_index('date')
+                    daily_rl_perf_df = update_portfolio_values_daily(rl_history_df, all_prices_pivot) # Your existing function
+                    if daily_rl_perf_df is not None and not daily_rl_perf_df.empty and 'returns' in daily_rl_perf_df:
+                        metrics_calculator = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL) # Fresh instance for metrics
+                        results_summary['RL_Strategy'] = metrics_calculator.calculate_metrics(portfolio_returns_series=daily_rl_perf_df['returns'].fillna(0))
+                        all_portfolio_dfs['RL_Strategy'] = daily_rl_perf_df
+                        try:
+                            daily_rl_perf_df.to_csv(configs.RESULTS_DIR / f"{configs.RL_ALGORITHM.lower()}_performance_daily.csv")
+                            logger.info(f"RL Strategy daily performance saved.")
+                        except Exception as e_save_rl: logger.error(f"Error saving RL Strategy performance: {e_save_rl}")
+                    else: logger.error("RL Strategy daily perf DF empty/missing returns.")
+                else: logger.info("RL backtester history is empty.")
 
     # --- 4. Tổng hợp và In Kết quả ---
     if results_summary:

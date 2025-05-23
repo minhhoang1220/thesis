@@ -121,3 +121,45 @@ SOFT_SIGNAL_MODEL_NAME = 'XGBoost' # Model tốt nhất của bạn
 SOFT_SIGNAL_TRAIN_END_DATE = "2022-12-31" # Huấn luyện model đến hết năm 2022
 SOFT_SIGNAL_PREDICT_START_DATE = PORTFOLIO_START_DATE # Dự đoán cho năm 2023
 SOFT_SIGNAL_PREDICT_END_DATE = PORTFOLIO_END_DATE
+
+# --- Reinforcement Learning Portfolio Optimization ---
+RL_STRATEGY_ENABLED = True # Đặt True để chạy chiến lược RL
+RL_TRAIN_DATA_START_DATE = "2020-01-01" # Ví dụ: Sử dụng dữ liệu sớm hơn để huấn luyện
+RL_TRAIN_DATA_END_DATE = "2022-12-31"   # Ví dụ: Huấn luyện đến trước giai đoạn backtest danh mục
+
+RL_LOOKBACK_WINDOW_SIZE = 30 # Số ngày lịch sử giá cho trạng thái
+RL_REBALANCE_FREQUENCY_DAYS = 5 # ví dụ: tái cân bằng hàng tuần (tác nhân RL thực hiện một bước mỗi 5 ngày giao dịch)
+RL_TRANSACTION_COST_BPS = 10 # Điểm cơ bản cho môi trường RL
+RL_FINANCIAL_FEATURES = ['ROA', 'ROE', 'EPS', 'P/E Ratio', 'Debt/Equity', 'Dividend Yield']
+RL_PROB_FEATURES = [f'prob_increase_{SOFT_SIGNAL_MODEL_NAME}']
+
+#  --- Cấu hình Phần thưởng RL ---
+RL_REWARD_USE_LOG_RETURN = True # True để dùng log return, False để dùng simple return
+RL_REWARD_TURNOVER_PENALTY_FACTOR = 0.001 # Hình phạt cho turnover. Đặt 0 để tắt.
+                                        # Giá trị này cần tinh chỉnh, có thể là 0.0001, 0.0005, 0.001, 0.005
+
+# --- Cấu hình Thuật toán và Huấn luyện RL ---
+RL_ALGORITHM = "PPO"
+RL_TOTAL_TIMESTEPS = 500000 # Tăng số bước huấn luyện
+RL_MODEL_DIR = RESULTS_DIR / "rl_models"
+RL_MODEL_NAME = f"{RL_ALGORITHM.lower()}_portfolio_agent.zip"
+RL_MODEL_SAVE_PATH = RL_MODEL_DIR / RL_MODEL_NAME
+RL_LOG_DIR = RL_MODEL_DIR / "logs"
+
+# --- Siêu tham số PPO (có thể điều chỉnh) ---
+RL_PPO_N_STEPS = 2048          # Mặc định của SB3 PPO. Số bước thu thập trước mỗi lần cập nhật.
+                                # Nếu ep_len_mean nhỏ, có thể giảm (ví dụ 512, 1024)
+RL_PPO_BATCH_SIZE = 64         # Mặc định 64. Thử 128, 256.
+RL_PPO_N_EPOCHS = 10           # Mặc định 10.
+RL_PPO_GAMMA = 0.99            # Hệ số chiết khấu. Thử 0.95, 0.98.
+RL_PPO_GAE_LAMBDA = 0.95       # Factor for GAE. Thử 0.9, 0.98.
+RL_PPO_CLIP_RANGE = 0.2        # Mặc định 0.2. Thử 0.1, 0.3.
+RL_PPO_ENT_COEF = 0.0          # Hệ số Entropy. Mặc định 0.0. Thử 0.01, 0.005 để tăng khám phá.
+RL_PPO_VF_COEF = 0.5           # Hệ số Value Function. Mặc định 0.5.
+RL_PPO_MAX_GRAD_NORM = 0.5     # Mặc định 0.5.
+RL_PPO_LEARNING_RATE = 0.0003  # Tốc độ học. Thử 1e-4, 5e-4.
+
+# Kiến trúc mạng cho PPO (ví dụ: 2 lớp ẩn, mỗi lớp 64 units)
+RL_PPO_POLICY_KWARGS = dict(net_arch=dict(pi=[64, 64], vf=[64, 64]))
+# Thử nghiệm: net_arch=dict(pi=[128, 128], vf=[128, 128])
+# Hoặc: net_arch=dict(pi=[256, 128, 64], vf=[256, 128, 64])
