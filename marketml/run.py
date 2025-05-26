@@ -1,5 +1,5 @@
-from marketml.data.loader import load_price_data, load_financial_data
-from marketml.data.loader.preprocess import standardize_data  # Import hàm chuẩn hóa
+from marketml.data_handling.loader import load_price_data, load_financial_data
+from marketml.data_handling.preprocess import standardize_data  # Import hàm chuẩn hóa
 # from marketml.plot.visualizer import plot_all_closing_prices
 
 def main():

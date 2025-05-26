@@ -1,0 +1,644 @@
+2025-05-27 04:32:30,679 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 04:32:30,680 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-05-27 04:32:30,680 - marketml_project - INFO - Attempting to run stage: build_features
+2025-05-27 04:32:30,681 - marketml_project - ERROR - Error running stage build_features: cannot import name 'build_features_01' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 14, in run_stage
+    from marketml.pipelines import build_features_01 # Use updated name
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ImportError: cannot import name 'build_features_01' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:32:30,681 - marketml_project - INFO - Attempting to run stage: train_forecasting
+2025-05-27 04:32:30,681 - marketml_project - ERROR - Error running stage train_forecasting: cannot import name 'train_forecasting_models_02' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 17, in run_stage
+    from marketml.pipelines import train_forecasting_models_02 # Use updated name
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ImportError: cannot import name 'train_forecasting_models_02' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:32:30,682 - marketml_project - INFO - Attempting to run stage: generate_forecasts
+2025-05-27 04:32:30,682 - marketml_project - ERROR - Error running stage generate_forecasts: cannot import name 'generate_forecasts_03' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 20, in run_stage
+    from marketml.pipelines import generate_forecasts_03
+ImportError: cannot import name 'generate_forecasts_03' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:32:30,682 - marketml_project - INFO - Attempting to run stage: generate_signals
+2025-05-27 04:32:30,682 - marketml_project - ERROR - Error running stage generate_signals: cannot import name 'generate_signals_04' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 23, in run_stage
+    from marketml.pipelines import generate_signals_04
+ImportError: cannot import name 'generate_signals_04' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:32:30,682 - marketml_project - INFO - Attempting to run stage: run_backtests
+2025-05-27 04:32:30,682 - marketml_project - ERROR - Error running stage run_backtests: cannot import name 'run_portfolio_backtests_05' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 26, in run_stage
+    from marketml.pipelines import run_portfolio_backtests_05
+ImportError: cannot import name 'run_portfolio_backtests_05' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:32:30,683 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 04:32:31,327 - marketml_project - INFO - --- Analyzing Model Performance ---
+2025-05-27 04:32:31,328 - marketml_project - INFO - Loading performance summary from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-27 04:32:31,329 - marketml_project - ERROR - Summary file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv'. Please run '02_train_forecasting_models.py' to generate results first.
+2025-05-27 04:32:31,329 - marketml_project - WARNING - Summary data not loaded or empty. No analysis performed.
+2025-05-27 04:32:31,329 - marketml_project - INFO - --- Analysis Finished ---
+2025-05-27 04:32:31,329 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-27 04:32:31,329 - marketml_project - INFO - Pipeline finished.
+2025-05-27 04:34:14,202 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 04:34:14,203 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-05-27 04:34:14,203 - marketml_project - INFO - Attempting to run stage: build_features
+2025-05-27 04:34:14,204 - marketml_project - ERROR - Error running stage build_features: cannot import name 'build_features_01' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 14, in run_stage
+    from marketml.pipelines import build_features_01 # Use updated name
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ImportError: cannot import name 'build_features_01' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:34:14,204 - marketml_project - INFO - Attempting to run stage: train_forecasting
+2025-05-27 04:34:14,204 - marketml_project - ERROR - Error running stage train_forecasting: cannot import name 'train_forecasting_models_02' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 17, in run_stage
+    from marketml.pipelines import train_forecasting_models_02 # Use updated name
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ImportError: cannot import name 'train_forecasting_models_02' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:34:14,205 - marketml_project - INFO - Attempting to run stage: generate_forecasts
+2025-05-27 04:34:14,205 - marketml_project - ERROR - Error running stage generate_forecasts: cannot import name 'generate_forecasts_03' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 20, in run_stage
+    from marketml.pipelines import generate_forecasts_03
+ImportError: cannot import name 'generate_forecasts_03' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:34:14,205 - marketml_project - INFO - Attempting to run stage: generate_signals
+2025-05-27 04:34:14,205 - marketml_project - ERROR - Error running stage generate_signals: cannot import name 'generate_signals_04' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 23, in run_stage
+    from marketml.pipelines import generate_signals_04
+ImportError: cannot import name 'generate_signals_04' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:34:14,205 - marketml_project - INFO - Attempting to run stage: run_backtests
+2025-05-27 04:34:14,205 - marketml_project - ERROR - Error running stage run_backtests: cannot import name 'run_portfolio_backtests_05' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 26, in run_stage
+    from marketml.pipelines import run_portfolio_backtests_05
+ImportError: cannot import name 'run_portfolio_backtests_05' from 'marketml.pipelines' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/__init__.py)
+2025-05-27 04:34:14,206 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 04:34:14,626 - marketml_project - INFO - --- Analyzing Model Performance ---
+2025-05-27 04:34:14,626 - marketml_project - INFO - Loading performance summary from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-27 04:34:14,627 - marketml_project - ERROR - Summary file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv'. Please run '02_train_forecasting_models.py' to generate results first.
+2025-05-27 04:34:14,627 - marketml_project - WARNING - Summary data not loaded or empty. No analysis performed.
+2025-05-27 04:34:14,627 - marketml_project - INFO - --- Analysis Finished ---
+2025-05-27 04:34:14,627 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-27 04:34:14,627 - marketml_project - INFO - Pipeline finished.
+2025-05-27 04:38:06,210 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 04:38:06,213 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-05-27 04:38:06,213 - marketml_project - INFO - Attempting to run stage: build_features
+2025-05-27 04:38:06,216 - marketml_project - ERROR - Error running stage build_features: No module named 'marketml.data_handling.price_loader'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 14, in run_stage
+    from marketml.pipelines import builder_features_01  # Use updated name
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/builder_features_01.py", line 3, in <module>
+    from marketml.data_handling.loader import load_price_data
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_handling/__init__.py", line 1, in <module>
+    from .price_loader import load_price_data
+ModuleNotFoundError: No module named 'marketml.data_handling.price_loader'
+2025-05-27 04:38:06,217 - marketml_project - INFO - Attempting to run stage: train_forecasting
+2025-05-27 04:38:06,221 - marketml_project - ERROR - Error running stage train_forecasting: '{' was never closed (train_forecasting_models_02.py, line 307)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 17, in run_stage
+    from marketml.pipelines import train_forecasting_models_02 # Use updated name
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/train_forecasting_models_02.py", line 307
+    transformer_params_set = {
+                             ^
+SyntaxError: '{' was never closed
+2025-05-27 04:38:06,221 - marketml_project - INFO - Attempting to run stage: generate_forecasts
+2025-05-27 04:38:07,273 - marketml_project - INFO - Starting: 03_generate_forecasts pipeline
+2025-05-27 04:38:07,273 - marketml_project - INFO - --- Generating Forecast for Year 2025 using last 3 years of data ---
+2025-05-27 04:38:07,273 - marketml_project - INFO - Attempting to load enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 04:38:07,274 - marketml_project - ERROR - Enriched data file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv'.
+2025-05-27 04:38:07,274 - marketml_project - ERROR - Ensure 'price_data_enriched_v2.csv' was created by '01_build_features.py' pipeline.
+2025-05-27 04:38:07,274 - marketml_project - WARNING - Forecast generation script completed, but no forecast data was produced or saved.
+2025-05-27 04:38:07,274 - marketml_project - INFO - Finished: 03_generate_forecasts pipeline
+2025-05-27 04:38:07,274 - marketml_project - INFO - Successfully completed stage: generate_forecasts
+2025-05-27 04:38:07,274 - marketml_project - INFO - Attempting to run stage: generate_signals
+2025-05-27 04:38:07,276 - marketml_project - ERROR - Error running stage generate_signals: No module named 'marketml.data_handling.price_loader'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 23, in run_stage
+    from marketml.pipelines import generate_signals_04
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/generate_signals_04.py", line 13, in <module>
+    from marketml.data_handling import preprocess
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_handling/__init__.py", line 1, in <module>
+    from .price_loader import load_price_data
+ModuleNotFoundError: No module named 'marketml.data_handling.price_loader'
+2025-05-27 04:38:07,277 - marketml_project - INFO - Attempting to run stage: run_backtests
+2025-05-27 04:38:07,282 - marketml_project - ERROR - Error running stage run_backtests: keyword argument repeated: log_dir (run_portfolio_backtests_05.py, line 552)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 26, in run_stage
+    from marketml.pipelines import run_portfolio_backtests_05
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/run_portfolio_backtests_05.py", line 552
+    log_dir=configs.RL_LOG_DIR,
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: keyword argument repeated: log_dir
+2025-05-27 04:38:07,282 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 04:38:07,359 - marketml_project - INFO - --- Analyzing Model Performance ---
+2025-05-27 04:38:07,359 - marketml_project - INFO - Loading performance summary from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-27 04:38:07,360 - marketml_project - ERROR - Summary file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv'. Please run '02_train_forecasting_models.py' to generate results first.
+2025-05-27 04:38:07,360 - marketml_project - WARNING - Summary data not loaded or empty. No analysis performed.
+2025-05-27 04:38:07,360 - marketml_project - INFO - --- Analysis Finished ---
+2025-05-27 04:38:07,360 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-27 04:38:07,360 - marketml_project - INFO - Pipeline finished.
+2025-05-27 04:52:47,034 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 04:52:47,036 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-05-27 04:52:47,036 - marketml_project - INFO - Attempting to run stage: build_features
+2025-05-27 04:52:47,056 - marketml_project - ERROR - Error running stage build_features: cannot import name 'add_technical_indicators' from 'marketml.features' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/features/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 14, in run_stage
+    from marketml.pipelines import builder_features_01  # Use updated name
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/builder_features_01.py", line 4, in <module>
+    from marketml.features.feature_builder import build_enriched_features
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/features/feature_builder.py", line 6, in <module>
+    from marketml.features import ta_indicators, add_technical_indicators
+ImportError: cannot import name 'add_technical_indicators' from 'marketml.features' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/features/__init__.py)
+2025-05-27 04:52:47,057 - marketml_project - INFO - Attempting to run stage: train_forecasting
+2025-05-27 04:52:53,751 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 04:52:53,796 - marketml_project - INFO - Starting: 02_train_forecasting_models pipeline
+2025-05-27 04:52:53,796 - marketml_project - INFO - Loading enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 04:52:53,797 - marketml_project - ERROR - CRITICAL: Enriched data file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv'. Run '01_build_features.py' first. Exiting.
+2025-05-27 04:52:53,797 - marketml_project - INFO - Successfully completed stage: train_forecasting
+2025-05-27 04:52:53,798 - marketml_project - INFO - Attempting to run stage: generate_forecasts
+2025-05-27 04:52:53,800 - marketml_project - INFO - Starting: 03_generate_forecasts pipeline
+2025-05-27 04:52:53,801 - marketml_project - INFO - --- Generating Forecast for Year 2025 using last 3 years of data ---
+2025-05-27 04:52:53,801 - marketml_project - INFO - Attempting to load enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 04:52:53,802 - marketml_project - ERROR - Enriched data file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv'.
+2025-05-27 04:52:53,802 - marketml_project - ERROR - Ensure 'price_data_enriched_v2.csv' was created by '01_build_features.py' pipeline.
+2025-05-27 04:52:53,802 - marketml_project - WARNING - Forecast generation script completed, but no forecast data was produced or saved.
+2025-05-27 04:52:53,802 - marketml_project - INFO - Finished: 03_generate_forecasts pipeline
+2025-05-27 04:52:53,803 - marketml_project - INFO - Successfully completed stage: generate_forecasts
+2025-05-27 04:52:53,803 - marketml_project - INFO - Attempting to run stage: generate_signals
+2025-05-27 04:52:53,804 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 04:52:53,804 - marketml_project - INFO - Starting: 04_generate_signals pipeline
+2025-05-27 04:52:53,804 - marketml_project - ERROR - CRITICAL: Enriched data file not found at /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv. Run '01_build_features.py' first. Aborting.
+2025-05-27 04:52:53,804 - marketml_project - INFO - Successfully completed stage: generate_signals
+2025-05-27 04:52:53,804 - marketml_project - INFO - Attempting to run stage: run_backtests
+2025-05-27 04:52:54,069 - marketml_project - ERROR - Error running stage run_backtests: cannot import name 'logger_setup' from 'marketml' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/__init__.py)
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 26, in run_stage
+    from marketml.pipelines import run_portfolio_backtests_05
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/run_portfolio_backtests_05.py", line 12, in <module>
+    from marketml.portfolio_opt import (
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/portfolio_opt/data_preparation.py", line 11, in <module>
+    from marketml import logger_setup
+ImportError: cannot import name 'logger_setup' from 'marketml' (/home/hoang/Documents/KhoaLuan/.ndmh/marketml/__init__.py)
+2025-05-27 04:52:54,070 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 04:52:54,110 - marketml_project - INFO - --- Analyzing Model Performance ---
+2025-05-27 04:52:54,111 - marketml_project - INFO - Loading performance summary from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-27 04:52:54,112 - marketml_project - ERROR - Summary file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv'. Please run '02_train_forecasting_models.py' to generate results first.
+2025-05-27 04:52:54,112 - marketml_project - WARNING - Summary data not loaded or empty. No analysis performed.
+2025-05-27 04:52:54,112 - marketml_project - INFO - --- Analysis Finished ---
+2025-05-27 04:52:54,112 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-27 04:52:54,113 - marketml_project - INFO - Pipeline finished.
+2025-05-27 05:03:03,832 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 05:03:03,833 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-05-27 05:03:03,833 - marketml_project - INFO - Attempting to run stage: build_features
+2025-05-27 05:03:04,285 - marketml_project - INFO - Starting: 01_build_features pipeline
+2025-05-27 05:03:04,287 - marketml_project - ERROR - Raw price data is empty. Exiting feature building.
+2025-05-27 05:03:04,287 - marketml_project - INFO - Successfully completed stage: build_features
+2025-05-27 05:03:04,287 - marketml_project - INFO - Attempting to run stage: train_forecasting
+2025-05-27 05:03:07,653 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:03:07,653 - marketml_project - INFO - Starting: 02_train_forecasting_models pipeline
+2025-05-27 05:03:07,654 - marketml_project - INFO - Loading enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:03:07,654 - marketml_project - ERROR - CRITICAL: Enriched data file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv'. Run '01_build_features.py' first. Exiting.
+2025-05-27 05:03:07,654 - marketml_project - INFO - Successfully completed stage: train_forecasting
+2025-05-27 05:03:07,654 - marketml_project - INFO - Attempting to run stage: generate_forecasts
+2025-05-27 05:03:07,655 - marketml_project - INFO - Starting: 03_generate_forecasts pipeline
+2025-05-27 05:03:07,655 - marketml_project - INFO - --- Generating Forecast for Year 2025 using last 3 years of data ---
+2025-05-27 05:03:07,655 - marketml_project - INFO - Attempting to load enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:03:07,655 - marketml_project - ERROR - Enriched data file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv'.
+2025-05-27 05:03:07,655 - marketml_project - ERROR - Ensure 'price_data_enriched_v2.csv' was created by '01_build_features.py' pipeline.
+2025-05-27 05:03:07,655 - marketml_project - WARNING - Forecast generation script completed, but no forecast data was produced or saved.
+2025-05-27 05:03:07,656 - marketml_project - INFO - Finished: 03_generate_forecasts pipeline
+2025-05-27 05:03:07,656 - marketml_project - INFO - Successfully completed stage: generate_forecasts
+2025-05-27 05:03:07,656 - marketml_project - INFO - Attempting to run stage: generate_signals
+2025-05-27 05:03:07,656 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:03:07,656 - marketml_project - INFO - Starting: 04_generate_signals pipeline
+2025-05-27 05:03:07,656 - marketml_project - ERROR - CRITICAL: Enriched data file not found at /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv. Run '01_build_features.py' first. Aborting.
+2025-05-27 05:03:07,656 - marketml_project - INFO - Successfully completed stage: generate_signals
+2025-05-27 05:03:07,656 - marketml_project - INFO - Attempting to run stage: run_backtests
+2025-05-27 05:03:11,906 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:03:11,906 - marketml_project - ERROR - Error running stage run_backtests: module 'marketml.pipelines.run_portfolio_backtests_05' has no attribute 'main'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 27, in run_stage
+    run_portfolio_backtests_05.main()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'marketml.pipelines.run_portfolio_backtests_05' has no attribute 'main'
+2025-05-27 05:03:11,907 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 05:03:11,908 - marketml_project - INFO - --- Analyzing Model Performance ---
+2025-05-27 05:03:11,908 - marketml_project - INFO - Loading performance summary from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-27 05:03:11,909 - marketml_project - ERROR - Summary file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv'. Please run '02_train_forecasting_models.py' to generate results first.
+2025-05-27 05:03:11,909 - marketml_project - WARNING - Summary data not loaded or empty. No analysis performed.
+2025-05-27 05:03:11,909 - marketml_project - INFO - --- Analysis Finished ---
+2025-05-27 05:03:11,909 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-27 05:03:11,909 - marketml_project - INFO - Pipeline finished.
+2025-05-27 05:10:09,447 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 05:10:09,449 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-05-27 05:10:09,449 - marketml_project - INFO - Attempting to run stage: build_features
+2025-05-27 05:10:09,924 - marketml_project - INFO - Starting: 01_build_features pipeline
+2025-05-27 05:10:09,999 - marketml_project - ERROR - Error running stage build_features: name 'preprocess' is not defined
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 15, in run_stage
+    builder_features_01.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/builder_features_01.py", line 16, in main
+    enriched_df = build_enriched_features(raw_prices)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/features/feature_builder.py", line 57, in build_enriched_features
+    standardized_df = preprocess.standardize_data(raw_real_df)
+                      ^^^^^^^^^^
+NameError: name 'preprocess' is not defined
+2025-05-27 05:10:10,003 - marketml_project - INFO - Attempting to run stage: train_forecasting
+2025-05-27 05:10:14,803 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:10:14,803 - marketml_project - INFO - Starting: 02_train_forecasting_models pipeline
+2025-05-27 05:10:14,803 - marketml_project - INFO - Loading enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:10:14,804 - marketml_project - ERROR - CRITICAL: Enriched data file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv'. Run '01_build_features.py' first. Exiting.
+2025-05-27 05:10:14,804 - marketml_project - INFO - Successfully completed stage: train_forecasting
+2025-05-27 05:10:14,804 - marketml_project - INFO - Attempting to run stage: generate_forecasts
+2025-05-27 05:10:14,805 - marketml_project - INFO - Starting: 03_generate_forecasts pipeline
+2025-05-27 05:10:14,805 - marketml_project - INFO - --- Generating Forecast for Year 2025 using last 3 years of data ---
+2025-05-27 05:10:14,805 - marketml_project - INFO - Attempting to load enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:10:14,805 - marketml_project - ERROR - Enriched data file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv'.
+2025-05-27 05:10:14,805 - marketml_project - ERROR - Ensure 'price_data_enriched_v2.csv' was created by '01_build_features.py' pipeline.
+2025-05-27 05:10:14,805 - marketml_project - WARNING - Forecast generation script completed, but no forecast data was produced or saved.
+2025-05-27 05:10:14,805 - marketml_project - INFO - Finished: 03_generate_forecasts pipeline
+2025-05-27 05:10:14,805 - marketml_project - INFO - Successfully completed stage: generate_forecasts
+2025-05-27 05:10:14,806 - marketml_project - INFO - Attempting to run stage: generate_signals
+2025-05-27 05:10:14,806 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:10:14,806 - marketml_project - INFO - Starting: 04_generate_signals pipeline
+2025-05-27 05:10:14,807 - marketml_project - ERROR - CRITICAL: Enriched data file not found at /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv. Run '01_build_features.py' first. Aborting.
+2025-05-27 05:10:14,807 - marketml_project - INFO - Successfully completed stage: generate_signals
+2025-05-27 05:10:14,807 - marketml_project - INFO - Attempting to run stage: run_backtests
+2025-05-27 05:10:18,125 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:10:18,125 - marketml_project - INFO - Starting: 05_run_portfolio_backtests pipeline
+2025-05-27 05:10:18,125 - marketml_project - INFO - Loading and preparing master data for portfolio optimization run...
+2025-05-27 05:10:18,127 - marketml_project - ERROR - CRITICAL: Price data for backtest is empty. Exiting.
+2025-05-27 05:10:18,127 - marketml_project - INFO - Successfully completed stage: run_backtests
+2025-05-27 05:10:18,127 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 05:10:18,128 - marketml_project - INFO - --- Analyzing Model Performance ---
+2025-05-27 05:10:18,128 - marketml_project - INFO - Loading performance summary from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-27 05:10:18,128 - marketml_project - ERROR - Summary file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv'. Please run '02_train_forecasting_models.py' to generate results first.
+2025-05-27 05:10:18,128 - marketml_project - WARNING - Summary data not loaded or empty. No analysis performed.
+2025-05-27 05:10:18,128 - marketml_project - INFO - --- Analysis Finished ---
+2025-05-27 05:10:18,128 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-27 05:10:18,129 - marketml_project - INFO - Pipeline finished.
+2025-05-27 05:12:45,890 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 05:12:45,891 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-05-27 05:12:45,891 - marketml_project - INFO - Attempting to run stage: build_features
+2025-05-27 05:12:46,398 - marketml_project - INFO - Starting: 01_build_features pipeline
+2025-05-27 05:12:53,063 - marketml_project - INFO - Enriched data saved to: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:12:53,063 - marketml_project - INFO - Finished: 01_build_features pipeline
+2025-05-27 05:12:53,064 - marketml_project - INFO - Successfully completed stage: build_features
+2025-05-27 05:12:53,064 - marketml_project - INFO - Attempting to run stage: train_forecasting
+2025-05-27 05:12:56,490 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:12:56,491 - marketml_project - INFO - Starting: 02_train_forecasting_models pipeline
+2025-05-27 05:12:56,491 - marketml_project - INFO - Loading enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:12:56,587 - marketml_project - INFO - Enriched data loaded successfully.
+2025-05-27 05:12:56,587 - marketml_project - INFO - Starting Cross-Validation Runs for forecasting models...
+2025-05-27 05:12:56,587 - marketml_project - INFO - Using 22 features for ML models: ['BB_Lower', 'BB_Upper', 'EMA_20', 'MACD', 'MACD_Hist', 'MACD_Signal', 'OBV', 'RSI', 'RSI_roll_mean_10', 'RSI_roll_mean_5', 'RSI_roll_std_10', 'RSI_roll_std_5', 'close_roll_mean_10', 'close_roll_mean_5', 'close_roll_std_10', 'close_roll_std_5', 'close_zscore_20', 'garch_vol_forecast', 'pct_change_lag_1', 'pct_change_lag_3', 'pct_change_lag_5', 'volume']
+2025-05-27 05:12:56,588 - marketml_project - INFO - Generating CV splits (Expanding Window):
+2025-05-27 05:12:56,589 - marketml_project - INFO -   Initial Train: 365 days 00:00:00, Test Period: 365 days 00:00:00, Step Period: 365 days 00:00:00
+2025-05-27 05:12:56,595 - marketml_project - INFO -   Split 0: Train [2020-01-02:2020-12-31], Test [2021-01-04:2021-12-31]
+2025-05-27 05:12:56,596 - marketml_project - INFO - ===== Processing CV Split 0 =====
+2025-05-27 05:12:56,596 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-05-27 05:12:56,657 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-05-27 05:12:56,677 - marketml_project - INFO -   Sequence shapes: X_train=(3785, 10, 22), y_train=(3785,), X_test=(3771, 10, 22)
+2025-05-27 05:12:56,678 - marketml_project - INFO -   Class weights for Keras: {0: 0.7851068243103091, 1: 3.6676356589147288, 2: 0.687931661214104}
+2025-05-27 05:12:56,678 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-05-27 05:12:56,678 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-05-27 05:12:56,678 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-05-27 05:12:56,682 - marketml_project - ERROR - Error running stage train_forecasting: 'target_trend'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/indexes/base.py", line 3805, in get_loc
+    return self._engine.get_loc(casted_key)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
+  File "index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7081, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7089, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'target_trend'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 18, in run_stage
+    train_forecasting_models_02.main() # Assuming the main function is called 'main'
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/train_forecasting_models_02.py", line 340, in main
+    arima_results = arima_model.run_arima_evaluation(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/models/arima_model.py", line 40, in run_arima_evaluation
+    potential_trends_for_ticker = test_df.loc[test_df['ticker'] == ticker, target_col_trend]
+                                  ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/indexing.py", line 1184, in __getitem__
+    return self._getitem_tuple(key)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/indexing.py", line 1368, in _getitem_tuple
+    return self._getitem_lowerdim(tup)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/indexing.py", line 1065, in _getitem_lowerdim
+    section = self._getitem_axis(key, axis=i)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/indexing.py", line 1431, in _getitem_axis
+    return self._get_label(key, axis=axis)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/indexing.py", line 1381, in _get_label
+    return self.obj.xs(label, axis=axis)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/generic.py", line 4287, in xs
+    return self[key]
+           ~~~~^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/frame.py", line 4102, in __getitem__
+    indexer = self.columns.get_loc(key)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/.venv/lib/python3.12/site-packages/pandas/core/indexes/base.py", line 3812, in get_loc
+    raise KeyError(key) from err
+KeyError: 'target_trend'
+2025-05-27 05:12:56,700 - marketml_project - INFO - Attempting to run stage: generate_forecasts
+2025-05-27 05:12:56,701 - marketml_project - INFO - Starting: 03_generate_forecasts pipeline
+2025-05-27 05:12:56,701 - marketml_project - INFO - --- Generating Forecast for Year 2025 using last 3 years of data ---
+2025-05-27 05:12:56,701 - marketml_project - INFO - Attempting to load enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:12:56,775 - marketml_project - INFO - Enriched data loaded successfully. Shape: (18855, 27)
+2025-05-27 05:12:56,775 - marketml_project - INFO - Final training period defined: 2021-12-31 to 2024-12-30
+2025-05-27 05:12:56,783 - marketml_project - INFO - Forecasting for 262 business days from 2024-12-31 to 2025-12-31
+2025-05-27 05:12:56,784 - marketml_project - INFO - Found 15 unique tickers in the training data.
+2025-05-27 05:12:56,784 - marketml_project - INFO -   Processing forecast for ticker: AAPL
+2025-05-27 05:12:57,430 - marketml_project - INFO -     Successfully generated forecast for AAPL.
+2025-05-27 05:12:57,430 - marketml_project - INFO -   Processing forecast for ticker: AMZN
+2025-05-27 05:12:58,014 - marketml_project - INFO -     Successfully generated forecast for AMZN.
+2025-05-27 05:12:58,014 - marketml_project - INFO -   Processing forecast for ticker: F
+2025-05-27 05:12:58,622 - marketml_project - INFO -     Successfully generated forecast for F.
+2025-05-27 05:12:58,622 - marketml_project - INFO -   Processing forecast for ticker: GOOGL
+2025-05-27 05:12:59,368 - marketml_project - INFO -     Successfully generated forecast for GOOGL.
+2025-05-27 05:12:59,368 - marketml_project - INFO -   Processing forecast for ticker: JNJ
+2025-05-27 05:12:59,865 - marketml_project - INFO -     Successfully generated forecast for JNJ.
+2025-05-27 05:12:59,865 - marketml_project - INFO -   Processing forecast for ticker: JPM
+2025-05-27 05:13:00,212 - marketml_project - INFO -     Successfully generated forecast for JPM.
+2025-05-27 05:13:00,212 - marketml_project - INFO -   Processing forecast for ticker: META
+2025-05-27 05:13:00,827 - marketml_project - INFO -     Successfully generated forecast for META.
+2025-05-27 05:13:00,827 - marketml_project - INFO -   Processing forecast for ticker: MSFT
+2025-05-27 05:13:01,450 - marketml_project - INFO -     Successfully generated forecast for MSFT.
+2025-05-27 05:13:01,450 - marketml_project - INFO -   Processing forecast for ticker: NFLX
+2025-05-27 05:13:01,962 - marketml_project - INFO -     Successfully generated forecast for NFLX.
+2025-05-27 05:13:01,962 - marketml_project - INFO -   Processing forecast for ticker: NVDA
+2025-05-27 05:13:03,103 - marketml_project - INFO -     Successfully generated forecast for NVDA.
+2025-05-27 05:13:03,103 - marketml_project - INFO -   Processing forecast for ticker: PG
+2025-05-27 05:13:04,127 - marketml_project - INFO -     Successfully generated forecast for PG.
+2025-05-27 05:13:04,127 - marketml_project - INFO -   Processing forecast for ticker: TSLA
+2025-05-27 05:13:04,847 - marketml_project - INFO -     Successfully generated forecast for TSLA.
+2025-05-27 05:13:04,847 - marketml_project - INFO -   Processing forecast for ticker: UNH
+2025-05-27 05:13:05,471 - marketml_project - INFO -     Successfully generated forecast for UNH.
+2025-05-27 05:13:05,471 - marketml_project - INFO -   Processing forecast for ticker: V
+2025-05-27 05:13:06,009 - marketml_project - INFO -     Successfully generated forecast for V.
+2025-05-27 05:13:06,009 - marketml_project - INFO -   Processing forecast for ticker: XOM
+2025-05-27 05:13:07,864 - marketml_project - INFO -     Successfully generated forecast for XOM.
+2025-05-27 05:13:07,866 - marketml_project - INFO - Forecasts generated successfully for 15 tickers.
+2025-05-27 05:13:07,876 - marketml_project - INFO - Forecasts saved to: /home/hoang/Documents/KhoaLuan/.ndmh/forecasts_output/arima_forecast_2025.csv
+2025-05-27 05:13:07,877 - marketml_project - INFO - Forecast generation script finished successfully.
+2025-05-27 05:13:07,877 - marketml_project - INFO - Finished: 03_generate_forecasts pipeline
+2025-05-27 05:13:07,877 - marketml_project - INFO - Successfully completed stage: generate_forecasts
+2025-05-27 05:13:07,878 - marketml_project - INFO - Attempting to run stage: generate_signals
+2025-05-27 05:13:07,878 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:13:07,878 - marketml_project - INFO - Starting: 04_generate_signals pipeline
+2025-05-27 05:13:08,006 - marketml_project - INFO - Loaded enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv. Shape: (18855, 27)
+2025-05-27 05:13:08,006 - marketml_project - INFO - Using features for signal model: ['BB_Lower', 'BB_Upper', 'EMA_20', 'MACD', 'MACD_Hist', 'MACD_Signal', 'OBV', 'RSI', 'RSI_roll_mean_10', 'RSI_roll_mean_5', 'RSI_roll_std_10', 'RSI_roll_std_5', 'close_roll_mean_10', 'close_roll_mean_5', 'close_roll_std_10', 'close_roll_std_5', 'close_zscore_20', 'garch_vol_forecast', 'pct_change_lag_1', 'pct_change_lag_3', 'pct_change_lag_5', 'volume']
+2025-05-27 05:13:08,007 - marketml_project - INFO - Preparing training data for the soft signal model...
+2025-05-27 05:13:08,007 - marketml_project - INFO - Preparing data for signal generation from 2020-01-01 to 2022-12-31...
+2025-05-27 05:13:08,069 - marketml_project - WARNING - Feature 'garch_vol_forecast' is all NaN in the current data slice. Filling with 0 before imputation.
+2025-05-27 05:13:08,081 - marketml_project - INFO - Training soft signal model: XGBoost...
+2025-05-27 05:13:09,991 - marketml_project - INFO - XGBoost trained successfully.
+2025-05-27 05:13:09,992 - marketml_project - INFO - Preparing prediction data for the soft signal model...
+2025-05-27 05:13:09,992 - marketml_project - INFO - Preparing data for signal generation from 2023-01-01 to 2023-12-31...
+2025-05-27 05:13:10,011 - marketml_project - WARNING - Feature 'garch_vol_forecast' is all NaN in the current data slice. Filling with 0 before imputation.
+2025-05-27 05:13:10,022 - marketml_project - INFO - Predicting probabilities for period 2023-01-01 to 2023-12-31...
+2025-05-27 05:13:10,068 - marketml_project - INFO - Successfully generated and saved soft signals to: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/classification_probabilities.csv
+2025-05-27 05:13:10,072 - marketml_project - INFO - Output DataFrame head:
+          date ticker  prob_decrease_XGBoost  prob_neutral_XGBoost  prob_increase_XGBoost
+756 2023-01-03   AAPL               0.345948              0.097313               0.556739
+757 2023-01-04   AAPL               0.413917              0.040546               0.545537
+758 2023-01-05   AAPL               0.307537              0.060836               0.631627
+759 2023-01-06   AAPL               0.372445              0.048374               0.579181
+760 2023-01-09   AAPL               0.416833              0.113690               0.469476
+2025-05-27 05:13:10,073 - marketml_project - INFO - Finished: 04_generate_signals pipeline
+2025-05-27 05:13:10,076 - marketml_project - INFO - Successfully completed stage: generate_signals
+2025-05-27 05:13:10,076 - marketml_project - INFO - Attempting to run stage: run_backtests
+2025-05-27 05:13:12,736 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:13:12,736 - marketml_project - INFO - Starting: 05_run_portfolio_backtests pipeline
+2025-05-27 05:13:12,736 - marketml_project - INFO - Loading and preparing master data for portfolio optimization run...
+2025-05-27 05:13:12,912 - marketml_project - ERROR - Error running stage run_backtests: module 'marketml.configs.configs' has no attribute 'MAIN_FINANCIAL_DATA_FILE'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 27, in run_stage
+    run_portfolio_backtests_05.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/pipelines/run_portfolio_backtests_05.py", line 194, in main
+    financial_data_master = data_preparation.load_financial_data_for_portfolio()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/portfolio_opt/data_preparation.py", line 107, in load_financial_data_for_portfolio
+    file_path = configs.MAIN_FINANCIAL_DATA_FILE # Using MAIN_FINANCIAL_DATA_FILE from configs
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'marketml.configs.configs' has no attribute 'MAIN_FINANCIAL_DATA_FILE'
+2025-05-27 05:13:12,927 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 05:13:12,928 - marketml_project - INFO - --- Analyzing Model Performance ---
+2025-05-27 05:13:12,928 - marketml_project - INFO - Loading performance summary from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-27 05:13:12,928 - marketml_project - ERROR - Summary file not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv'. Please run '02_train_forecasting_models.py' to generate results first.
+2025-05-27 05:13:12,928 - marketml_project - WARNING - Summary data not loaded or empty. No analysis performed.
+2025-05-27 05:13:12,928 - marketml_project - INFO - --- Analysis Finished ---
+2025-05-27 05:13:12,928 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-27 05:13:12,928 - marketml_project - INFO - Pipeline finished.
+2025-05-27 05:19:00,998 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 05:19:00,999 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-05-27 05:19:00,999 - marketml_project - INFO - Attempting to run stage: build_features
+2025-05-27 05:19:01,412 - marketml_project - INFO - Starting: 01_build_features pipeline
+2025-05-27 05:19:07,963 - marketml_project - INFO - Enriched data saved to: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:19:07,963 - marketml_project - INFO - Finished: 01_build_features pipeline
+2025-05-27 05:19:07,963 - marketml_project - INFO - Successfully completed stage: build_features
+2025-05-27 05:19:07,964 - marketml_project - INFO - Attempting to run stage: train_forecasting
+2025-05-27 05:19:11,888 - marketml_project - INFO - Random seeds set to: 42
+2025-05-27 05:19:11,888 - marketml_project - INFO - Starting: 02_train_forecasting_models pipeline
+2025-05-27 05:19:11,888 - marketml_project - INFO - Loading enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/data_processed/price_data_enriched_v2.csv
+2025-05-27 05:19:12,024 - marketml_project - INFO - Enriched data loaded successfully.
+2025-05-27 05:19:12,025 - marketml_project - INFO - Starting Cross-Validation Runs for forecasting models...
+2025-05-27 05:19:12,025 - marketml_project - INFO - Using 22 features for ML models: ['BB_Lower', 'BB_Upper', 'EMA_20', 'MACD', 'MACD_Hist', 'MACD_Signal', 'OBV', 'RSI', 'RSI_roll_mean_10', 'RSI_roll_mean_5', 'RSI_roll_std_10', 'RSI_roll_std_5', 'close_roll_mean_10', 'close_roll_mean_5', 'close_roll_std_10', 'close_roll_std_5', 'close_zscore_20', 'garch_vol_forecast', 'pct_change_lag_1', 'pct_change_lag_3', 'pct_change_lag_5', 'volume']
+2025-05-27 05:19:12,025 - marketml_project - INFO - Generating CV splits (Expanding Window):
+2025-05-27 05:19:12,025 - marketml_project - INFO -   Initial Train: 365 days 00:00:00, Test Period: 365 days 00:00:00, Step Period: 365 days 00:00:00
+2025-05-27 05:19:12,030 - marketml_project - INFO -   Split 0: Train [2020-01-02:2020-12-31], Test [2021-01-04:2021-12-31]
+2025-05-27 05:19:12,030 - marketml_project - INFO - ===== Processing CV Split 0 =====
+2025-05-27 05:19:12,030 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-05-27 05:19:12,048 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-05-27 05:19:12,107 - marketml_project - INFO -   Sequence shapes: X_train=(3785, 10, 22), y_train=(3785,), X_test=(3771, 10, 22)
+2025-05-27 05:19:12,107 - marketml_project - INFO -   Class weights for Keras: {0: 0.7851068243103091, 1: 3.6676356589147288, 2: 0.687931661214104}
+2025-05-27 05:19:12,107 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-05-27 05:19:12,107 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-05-27 05:19:12,107 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-05-27 05:20:03,537 - marketml_project - INFO - --- Evaluating ARIMA ---
+2025-05-27 05:20:03,554 - marketml_project - INFO -   Accuracy: 0.2555
+2025-05-27 05:20:03,554 - marketml_project - INFO -   Classification Report (ARIMA):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.57      0.00      0.01      1527
+No Change (0)       0.14      0.75      0.24       470
+ Increase (1)       0.48      0.34      0.40      1768
+
+     accuracy                           0.26      3765
+    macro avg       0.40      0.37      0.21      3765
+ weighted avg       0.48      0.26      0.22      3765
+
+2025-05-27 05:20:03,555 - marketml_project - INFO -   Running RandomForest model evaluation...
+2025-05-27 05:20:03,555 - marketml_project - INFO - --- Training and Evaluating RandomForest Model (with Tuning) ---
+2025-05-27 05:20:03,555 - marketml_project - INFO -   Performing RandomizedSearchCV for RandomForest (n_iter=30, cv=3)...
+2025-05-27 05:23:56,856 - marketml_project - INFO -   Best RandomForest params found: {'bootstrap': True, 'criterion': 'gini', 'max_depth': 11, 'min_samples_leaf': 12, 'min_samples_split': 17, 'n_estimators': 261}
+2025-05-27 05:23:56,857 - marketml_project - INFO -   Predicting with best RandomForest...
+2025-05-27 05:23:56,929 - marketml_project - INFO - --- Evaluating RandomForest ---
+2025-05-27 05:23:56,944 - marketml_project - INFO -   Accuracy: 0.3899
+2025-05-27 05:23:56,945 - marketml_project - INFO -   Classification Report (RandomForest):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.41      0.41      1530
+No Change (0)       0.17      0.29      0.21       471
+ Increase (1)       0.49      0.40      0.44      1779
+
+     accuracy                           0.39      3780
+    macro avg       0.36      0.37      0.35      3780
+ weighted avg       0.42      0.39      0.40      3780
+
+2025-05-27 05:23:56,946 - marketml_project - INFO -   Running XGBoost model evaluation...
+2025-05-27 05:23:56,946 - marketml_project - INFO - --- Training and Evaluating XGBoost Model (with Tuning) ---
+2025-05-27 05:23:56,946 - marketml_project - INFO -   Performing RandomizedSearchCV for XGBoost (n_iter=30, cv=3)...
+2025-05-27 05:24:31,507 - marketml_project - INFO -   Best XGBoost params found: {'colsample_bytree': 0.6541666010159665, 'gamma': 0.007983126110107097, 'learning_rate': 0.030780444305993408, 'max_depth': 6, 'n_estimators': 210, 'subsample': 0.7733054075301833}
+2025-05-27 05:24:31,508 - marketml_project - INFO -   Predicting with best XGBoost...
+2025-05-27 05:24:31,524 - marketml_project - INFO - --- Evaluating XGBoost ---
+2025-05-27 05:24:31,566 - marketml_project - INFO -   Accuracy: 0.4466
+2025-05-27 05:24:31,567 - marketml_project - INFO -   Classification Report (XGBoost):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.46      0.44      1530
+No Change (0)       0.00      0.00      0.00       471
+ Increase (1)       0.48      0.55      0.51      1779
+
+     accuracy                           0.45      3780
+    macro avg       0.30      0.34      0.32      3780
+ weighted avg       0.39      0.45      0.42      3780
+
+2025-05-27 05:24:31,568 - marketml_project - INFO -   Running SVM model evaluation...
+2025-05-27 05:24:31,569 - marketml_project - INFO - --- Training and Evaluating SVM Model (with Tuning) ---
+2025-05-27 05:24:31,569 - marketml_project - INFO -   Performing RandomizedSearchCV for SVM (n_iter=30, cv=3)...
+2025-05-27 05:25:02,796 - marketml_project - INFO -   Best SVM params found: {'C': 1.6523315728128767, 'degree': 2, 'gamma': 'auto', 'kernel': 'rbf'}
+2025-05-27 05:25:02,798 - marketml_project - INFO -   Predicting with best SVM...
+2025-05-27 05:25:04,656 - marketml_project - INFO - --- Evaluating SVM ---
+2025-05-27 05:25:04,767 - marketml_project - INFO -   Accuracy: 0.3074
+2025-05-27 05:25:04,771 - marketml_project - INFO -   Classification Report (SVM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.44      0.36      0.39      1530
+No Change (0)       0.15      0.59      0.23       471
+ Increase (1)       0.53      0.19      0.28      1779
+
+     accuracy                           0.31      3780
+    macro avg       0.37      0.38      0.30      3780
+ weighted avg       0.44      0.31      0.32      3780
+
+2025-05-27 05:25:04,777 - marketml_project - INFO -   Running LSTM model evaluation...
+2025-05-27 05:25:04,780 - marketml_project - INFO - --- Training and Evaluating LSTM Model ---
+2025-05-27 05:25:06,421 - marketml_project - INFO -   Training LSTM with params: units=128, dropout=0.25, lr=5e-05, epochs=50, batch_size=64
+2025-05-27 05:25:07,327 - marketml_project - INFO -     Training LSTM for up to 50 epochs...
+2025-05-27 05:25:53,912 - marketml_project - INFO -     LSTM training finished after 23 epochs.
+2025-05-27 05:25:53,913 - marketml_project - INFO -     Predicting with LSTM...
+2025-05-27 05:25:55,809 - marketml_project - INFO - --- Evaluating LSTM ---
+2025-05-27 05:25:55,820 - marketml_project - INFO -   Accuracy: 0.2875
+2025-05-27 05:25:55,820 - marketml_project - INFO -   Classification Report (LSTM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.45      0.19      0.26      1526
+No Change (0)       0.15      0.72      0.25       470
+ Increase (1)       0.50      0.26      0.34      1775
+
+     accuracy                           0.29      3771
+    macro avg       0.37      0.39      0.29      3771
+ weighted avg       0.44      0.29      0.30      3771
+
+2025-05-27 05:25:55,821 - marketml_project - INFO -   Running Transformer model evaluation...
+2025-05-27 05:25:55,821 - marketml_project - INFO - --- Training and Evaluating Transformer Model ---
+2025-05-27 05:25:56,347 - marketml_project - INFO -   Training Transformer with params: blocks=2, head_size=128, num_heads=4, ff_dim=128, dropout=0.35, lr=5e-05, epochs=50, batch_size=64, wd=0.0001
+2025-05-27 05:25:56,608 - marketml_project - INFO -     Using AdamW with CosineDecay learning rate schedule.
+2025-05-27 05:25:56,610 - marketml_project - INFO -     Training Transformer for up to 50 epochs...
+2025-05-27 05:26:30,611 - marketml_project - INFO -     Transformer training finished after 11 epochs.
+2025-05-27 05:26:30,611 - marketml_project - INFO -     Predicting with Transformer...
+2025-05-27 05:26:31,998 - marketml_project - INFO - --- Evaluating Transformer ---
+2025-05-27 05:26:32,054 - marketml_project - INFO -   Accuracy: 0.3002
+2025-05-27 05:26:32,054 - marketml_project - INFO -   Classification Report (Transformer):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.38      0.29      0.33      1526
+No Change (0)       0.11      0.37      0.18       470
+ Increase (1)       0.47      0.29      0.36      1775
+
+     accuracy                           0.30      3771
+    macro avg       0.32      0.32      0.29      3771
+ weighted avg       0.39      0.30      0.32      3771
+
+2025-05-27 05:26:32,055 - marketml_project - INFO - ===== Finished CV Split 0 =====
+2025-05-27 05:26:32,060 - marketml_project - INFO -   Split 1: Train [2020-01-02:2021-12-31], Test [2022-01-03:2022-12-30]
+2025-05-27 05:26:32,060 - marketml_project - INFO - ===== Processing CV Split 1 =====
+2025-05-27 05:26:32,061 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-05-27 05:26:32,079 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-05-27 05:26:32,147 - marketml_project - INFO -   Sequence shapes: X_train=(7565, 10, 22), y_train=(7565,), X_test=(3756, 10, 22)
+2025-05-27 05:26:32,148 - marketml_project - INFO -   Class weights for Keras: {0: 0.8007833174552768, 1: 3.152083333333333, 2: 0.6973635693215339}
+2025-05-27 05:26:32,148 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-05-27 05:26:32,148 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-05-27 05:26:32,148 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-05-27 05:28:26,931 - marketml_project - INFO - --- Evaluating ARIMA ---
+2025-05-27 05:28:26,946 - marketml_project - INFO -   Accuracy: 0.1877
+2025-05-27 05:28:26,946 - marketml_project - INFO -   Classification Report (ARIMA):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.50      0.00      0.00      1770
+No Change (0)       0.09      0.78      0.17       326
+ Increase (1)       0.45      0.27      0.34      1654
+
+     accuracy                           0.19      3750
+    macro avg       0.35      0.35      0.17      3750
+ weighted avg       0.44      0.19      0.16      3750
+
+2025-05-27 05:28:26,947 - marketml_project - INFO -   Running RandomForest model evaluation...
+2025-05-27 05:28:26,948 - marketml_project - INFO - --- Training and Evaluating RandomForest Model (with Tuning) ---
+2025-05-27 05:28:26,948 - marketml_project - INFO -   Performing RandomizedSearchCV for RandomForest (n_iter=30, cv=3)...

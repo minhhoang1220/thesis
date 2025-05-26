@@ -1,25 +1,44 @@
 # marketml/configs/configs.py
 from pathlib import Path
-import pandas as pd # Cần cho pd.Timedelta
+import pandas as pd
 
-# --- PATHS (Giữ nguyên đường dẫn tuyệt đối của bạn) ---
-# Ví dụ: bạn có thể giữ nguyên cách bạn xác định base_path ở đây
-# hoặc để chúng trong các module loader và các script chạy chính.
-# Để đơn giản, tôi sẽ giả định các script chạy chính vẫn tự quản lý base_path.
-# Tuy nhiên, các đường dẫn output có thể đặt ở đây.
-PROJECT_ROOT = Path(__file__).resolve().parents[2] # .ndmh/
-RESULTS_DIR = PROJECT_ROOT / "marketml" / "results" # Lưu kết quả vào .ndmh/marketml/results/
-FORECASTS_DIR = PROJECT_ROOT / "marketml" / "forecasts" # Lưu dự báo vào .ndmh/marketml/forecasts/
-ENRICHED_DATA_DIR = PROJECT_ROOT / "marketml" / "data" / "processed"
-ENRICHED_DATA_FILE = ENRICHED_DATA_DIR / "price_data_enriched_v2.csv" # File enriched data chính
+# PROJECT_ROOT is the .ndmh/ directory
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# --- Input Data Paths ---
+# NEW: Pointing to data_input directory within the project structure
+INPUT_DATA_DIR = PROJECT_ROOT / "marketml" / "data_input"
+RAW_GLOBAL_PRICE_FILE = INPUT_DATA_DIR / "yahoo_price_data_fixed.csv"
+RAW_GLOBAL_FINANCIAL_FILE = INPUT_DATA_DIR / "financial_data.csv"
+
+# --- Processed Data Paths ---
+PROCESSED_DATA_DIR = PROJECT_ROOT / "data_processed"
+ENRICHED_DATA_FILE = PROCESSED_DATA_DIR / "price_data_enriched_v2.csv"
+PRICE_DATA_FOR_PORTFOLIO_PATH = ENRICHED_DATA_FILE
+
+# --- Output Directories ---
+RESULTS_OUTPUT_DIR = PROJECT_ROOT / "results_output"
+FORECASTS_OUTPUT_DIR = PROJECT_ROOT / "forecasts_output"
+LOG_OUTPUT_DIR = PROJECT_ROOT / "logs"
+PLOTS_OUTPUT_DIR = RESULTS_OUTPUT_DIR / "plots"
+
+# --- File Names for Outputs (relative to output dirs) ---
+CLASSIFICATION_PROBS_FILE = RESULTS_OUTPUT_DIR / "classification_probabilities.csv"
+MODEL_PERF_SUMMARY_FILE = RESULTS_OUTPUT_DIR / "model_performance_summary.csv"
+MODEL_PERF_DETAILED_FILE = RESULTS_OUTPUT_DIR / "model_performance_detailed.csv"
+MARKOWITZ_PERF_DAILY_FILE = RESULTS_OUTPUT_DIR / "markowitz_performance_daily.csv"
+BLACKLITTERMAN_PERF_DAILY_FILE = RESULTS_OUTPUT_DIR / "blacklitterman_performance_daily.csv"
+
+RL_MODEL_DIR = RESULTS_OUTPUT_DIR / "rl_models"
+RL_MODEL_NAME = f"{'PPO'.lower()}_portfolio_agent.zip"
+RL_MODEL_SAVE_PATH = RL_MODEL_DIR / RL_MODEL_NAME
+RESULTS_DIR = PROJECT_ROOT / "marketml" / "results_output"
 
 # --- DATA PARAMETERS ---
-TIME_RANGE_START = "2020-01-01" # Có thể dùng để lọc dữ liệu nếu cần
+TIME_RANGE_START = "2020-01-01"
 TIME_RANGE_END = "2024-12-31"
 
 # --- FEATURE ENGINEERING PARAMETERS ---
-# (Các tham số cho add_technical_indicators, GARCH đã có trong create_enriched_data.py,
-# nhưng có thể chuyển một phần ra đây nếu muốn linh hoạt hơn từ bên ngoài)
 GARCH_WINDOW = 252
 GARCH_FORECAST_HORIZON = 1
 RSI_WINDOW = 14
@@ -77,89 +96,79 @@ FORECAST_YEAR_TARGET = 2025
 FORECAST_TRAINING_YEARS = 3
 FORECAST_TREND_THRESHOLD = 0.002
 APPROX_TRADING_DAYS_PER_YEAR = 252
-ENRICHED_DATA_FOR_FORECAST = ENRICHED_DATA_FILE # Dùng chung file enriched chính
+ENRICHED_DATA_FOR_FORECAST = ENRICHED_DATA_FILE
 
 # --- GENERAL PROJECT SETTINGS ---
 RANDOM_SEED = 42
 
 # --- PORTFOLIO OPTIMIZATION PARAMETERS ---
 PORTFOLIO_ASSETS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'F', 'JNJ', 'JPM', 'V', 'PG', 'UNH', 'XOM', 'NFLX']
-# PORTFOLIO_ASSETS = None # Để None nếu muốn dùng tất cả tickers có trong dữ liệu sau khi lọc theo ngày
-
 PORTFOLIO_START_DATE = "2023-01-01"
-PORTFOLIO_END_DATE = "2023-12-31" # Dùng dữ liệu 2023 để backtest
-REBALANCE_FREQUENCY = 'BM' # 'BM': Business Month End, 'BQS': Business Quarter Start, 'W-FRI': Weekly Friday, or integer (days)
+PORTFOLIO_END_DATE = "2023-12-31"
+REBALANCE_FREQUENCY = 'BM'
 
-FINANCIAL_DATA_FILE_PATH = PROJECT_ROOT / "financial_data.csv" # Đảm bảo file này ở thư mục gốc .ndmh/
-PRICE_DATA_FOR_PORTFOLIO_PATH = ENRICHED_DATA_FILE # Dùng file enriched cho dữ liệu giá
-# File chứa xác suất sẽ được tạo ra
-CLASSIFICATION_PROBS_FILE_PATH = RESULTS_DIR / "classification_probabilities.csv" # Sẽ lưu vào .ndmh/results/
+FINANCIAL_DATA_FILE_PATH = PROJECT_ROOT / "financial_data.csv"
+PRICE_DATA_FOR_PORTFOLIO_PATH = ENRICHED_DATA_FILE
+CLASSIFICATION_PROBS_FILE_PATH = RESULTS_DIR / "classification_probabilities.csv"
 
-ROLLING_WINDOW_COVARIANCE = 60 # ~3 tháng giao dịch
-ROLLING_WINDOW_RETURNS = 20  # ~1 tháng giao dịch
+ROLLING_WINDOW_COVARIANCE = 60
+ROLLING_WINDOW_RETURNS = 20
 
 # Markowitz Parameters
 MARKOWITZ_OBJECTIVE = 'max_sharpe'
-MARKOWITZ_RISK_FREE_RATE = 0.02 # Giả định lãi suất phi rủi ro 2%/năm
-MARKOWITZ_WEIGHT_BOUNDS = (0.01, 0.3) # Min 1%, Max 30% cho mỗi tài sản
+MARKOWITZ_RISK_FREE_RATE = 0.02
+MARKOWITZ_WEIGHT_BOUNDS = (0.01, 0.3)
 
 # Black-Litterman Parameters
 BL_TAU = 0.025
-BL_RISK_AVERSION = 2.5 # Delta (nếu tính market implied returns, hoặc dùng trong utility function của portfolio)
+BL_RISK_AVERSION = 2.5
 BL_PROB_THRESHOLD_STRONG_VIEW = 0.65
-BL_VIEW_CONFIDENCE_STRONG = 0.8 # Độ tin cậy (1 - variance scale) cho view mạnh
-BL_EXPECTED_OUTPERFORMANCE_STRONG = 0.05 # Kỳ vọng 5% outperform hàng năm cho view mạnh
+BL_VIEW_CONFIDENCE_STRONG = 0.8
+BL_EXPECTED_OUTPERFORMANCE_STRONG = 0.05
 
 # Backtesting Parameters
 INITIAL_CAPITAL = 100000
-TRANSACTION_COST_BPS = 5 # 5 bps = 0.05%
-# BENCHMARK_TICKER = '^GSPC' # Cần lấy dữ liệu giá cho S&P 500 nếu muốn so sánh
-# BENCHMARK_WEIGHTS = None # Hoặc danh mục 1/N
+TRANSACTION_COST_BPS = 5
 
-# Soft Signal Generation (từ classification model)
-SOFT_SIGNAL_MODEL_NAME = 'XGBoost' # Model tốt nhất của bạn
-SOFT_SIGNAL_TRAIN_END_DATE = "2022-12-31" # Huấn luyện model đến hết năm 2022
-SOFT_SIGNAL_PREDICT_START_DATE = PORTFOLIO_START_DATE # Dự đoán cho năm 2023
+# Soft Signal Generation (from classification model)
+SOFT_SIGNAL_MODEL_NAME = 'XGBoost'
+SOFT_SIGNAL_TRAIN_END_DATE = "2022-12-31"
+SOFT_SIGNAL_PREDICT_START_DATE = PORTFOLIO_START_DATE
 SOFT_SIGNAL_PREDICT_END_DATE = PORTFOLIO_END_DATE
 
 # --- Reinforcement Learning Portfolio Optimization ---
-RL_STRATEGY_ENABLED = True # Đặt True để chạy chiến lược RL
-RL_TRAIN_DATA_START_DATE = "2020-01-01" # Ví dụ: Sử dụng dữ liệu sớm hơn để huấn luyện
-RL_TRAIN_DATA_END_DATE = "2022-12-31"   # Ví dụ: Huấn luyện đến trước giai đoạn backtest danh mục
+RL_STRATEGY_ENABLED = True
+RL_TRAIN_DATA_START_DATE = "2020-01-01"
+RL_TRAIN_DATA_END_DATE = "2022-12-31"
 
-RL_LOOKBACK_WINDOW_SIZE = 30 # Số ngày lịch sử giá cho trạng thái
-RL_REBALANCE_FREQUENCY_DAYS = 5 # ví dụ: tái cân bằng hàng tuần (tác nhân RL thực hiện một bước mỗi 5 ngày giao dịch)
-RL_TRANSACTION_COST_BPS = 10 # Điểm cơ bản cho môi trường RL
+RL_LOOKBACK_WINDOW_SIZE = 30
+RL_REBALANCE_FREQUENCY_DAYS = 5
+RL_TRANSACTION_COST_BPS = 10
 RL_FINANCIAL_FEATURES = ['ROA', 'ROE', 'EPS', 'P/E Ratio', 'Debt/Equity', 'Dividend Yield']
 RL_PROB_FEATURES = [f'prob_increase_{SOFT_SIGNAL_MODEL_NAME}']
 
-#  --- Cấu hình Phần thưởng RL ---
-RL_REWARD_USE_LOG_RETURN = True # True để dùng log return, False để dùng simple return
-RL_REWARD_TURNOVER_PENALTY_FACTOR = 0.001 # Hình phạt cho turnover. Đặt 0 để tắt.
-                                        # Giá trị này cần tinh chỉnh, có thể là 0.0001, 0.0005, 0.001, 0.005
+#  --- RL Reward Configuration ---
+RL_REWARD_USE_LOG_RETURN = True
+RL_REWARD_TURNOVER_PENALTY_FACTOR = 0.001
 
-# --- Cấu hình Thuật toán và Huấn luyện RL ---
+# --- RL Algorithm and Training Configuration ---
 RL_ALGORITHM = "PPO"
-RL_TOTAL_TIMESTEPS = 500000 # Tăng số bước huấn luyện
-RL_MODEL_DIR = RESULTS_DIR / "rl_models"
-RL_MODEL_NAME = f"{RL_ALGORITHM.lower()}_portfolio_agent.zip"
-RL_MODEL_SAVE_PATH = RL_MODEL_DIR / RL_MODEL_NAME
+RL_LOG_DIR_FOR_SB3 = RL_MODEL_DIR / "sb3_logs"
+RL_TOTAL_TIMESTEPS = 500000
+
 RL_LOG_DIR = RL_MODEL_DIR / "logs"
 
-# --- Siêu tham số PPO (có thể điều chỉnh) ---
-RL_PPO_N_STEPS = 2048          # Mặc định của SB3 PPO. Số bước thu thập trước mỗi lần cập nhật.
-                                # Nếu ep_len_mean nhỏ, có thể giảm (ví dụ 512, 1024)
-RL_PPO_BATCH_SIZE = 64         # Mặc định 64. Thử 128, 256.
-RL_PPO_N_EPOCHS = 10           # Mặc định 10.
-RL_PPO_GAMMA = 0.99            # Hệ số chiết khấu. Thử 0.95, 0.98.
-RL_PPO_GAE_LAMBDA = 0.95       # Factor for GAE. Thử 0.9, 0.98.
-RL_PPO_CLIP_RANGE = 0.2        # Mặc định 0.2. Thử 0.1, 0.3.
-RL_PPO_ENT_COEF = 0.0          # Hệ số Entropy. Mặc định 0.0. Thử 0.01, 0.005 để tăng khám phá.
-RL_PPO_VF_COEF = 0.5           # Hệ số Value Function. Mặc định 0.5.
-RL_PPO_MAX_GRAD_NORM = 0.5     # Mặc định 0.5.
-RL_PPO_LEARNING_RATE = 0.0003  # Tốc độ học. Thử 1e-4, 5e-4.
+# --- PPO Hyperparameters (can be adjusted) ---
+RL_PPO_N_STEPS = 2048
+RL_PPO_BATCH_SIZE = 64
+RL_PPO_N_EPOCHS = 10
+RL_PPO_GAMMA = 0.99
+RL_PPO_GAE_LAMBDA = 0.95
+RL_PPO_CLIP_RANGE = 0.2
+RL_PPO_ENT_COEF = 0.0
+RL_PPO_VF_COEF = 0.5
+RL_PPO_MAX_GRAD_NORM = 0.5
+RL_PPO_LEARNING_RATE = 0.0003
 
-# Kiến trúc mạng cho PPO (ví dụ: 2 lớp ẩn, mỗi lớp 64 units)
+# Network architecture for PPO (example: 2 hidden layers, each with 64 units)
 RL_PPO_POLICY_KWARGS = dict(net_arch=dict(pi=[64, 64], vf=[64, 64]))
-# Thử nghiệm: net_arch=dict(pi=[128, 128], vf=[128, 128])
-# Hoặc: net_arch=dict(pi=[256, 128, 64], vf=[256, 128, 64])

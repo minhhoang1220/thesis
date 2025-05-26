@@ -1,9 +1,21 @@
-# marketml/utils/environment_setup.py
+# marketml/utils/logger_setup.py
 import warnings
 import logging
 from pathlib import Path
+import random
+import numpy as np
 
-_project_logger_configured = False # Biến cờ toàn cục cho module này
+# Attempt to import configs for LOG_OUTPUT_DIR
+try:
+    from marketml.configs import configs
+    LOG_DIR_FROM_CONFIG = configs.LOG_OUTPUT_DIR
+except ImportError:
+    # Fallback if configs cannot be imported (e.g., during initial setup or isolated test)
+    # This path will be relative to where logger_setup.py is, then up to project root
+    LOG_DIR_FROM_CONFIG = Path(__file__).resolve().parents[2] / "logs"
+    print(f"Warning: Could not import configs for logger setup. Defaulting log directory to: {LOG_DIR_FROM_CONFIG}")
+
+_project_logger_configured = False
 
 def suppress_common_warnings():
     """
@@ -40,47 +52,38 @@ def suppress_common_warnings():
 
 def setup_basic_logging(log_level=logging.INFO, log_file_name="project.log"):
     global _project_logger_configured
-    
-    logger = logging.getLogger("marketml_project")  # Luôn lấy logger gốc này
+    logger = logging.getLogger("marketml_project")
 
-    # Chỉ cấu hình nếu chưa được cấu hình trước đó
     if not _project_logger_configured:
-        project_root = Path(__file__).resolve().parents[2]
-        logs_dir = project_root / "logs"
+        logs_dir = LOG_DIR_FROM_CONFIG # Use path from configs or fallback
         logs_dir.mkdir(parents=True, exist_ok=True)
         log_file_path = logs_dir / log_file_name
 
-        # Xóa tất cả handlers hiện có để tránh lặp
+        # Delete all handlers that might loop
         for handler in logger.handlers[:]:
             logger.removeHandler(handler)
             handler.close()
 
         logger.setLevel(log_level)
-        
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-        # Chỉ thêm StreamHandler nếu chưa có
-        if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
-            ch = logging.StreamHandler()
-            ch.setLevel(log_level)
-            ch.setFormatter(formatter)
-            logger.addHandler(ch)
+        # StreamHandler (Console)
+        ch = logging.StreamHandler()
+        ch.setLevel(log_level)
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
 
-        # Chỉ thêm FileHandler nếu chưa có
-        if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
-            fh = logging.FileHandler(log_file_path)
-            fh.setLevel(log_level)
-            fh.setFormatter(formatter)
-            logger.addHandler(fh)
+        # FileHandler
+        fh = logging.FileHandler(log_file_path, mode='a') # Use 'a' to append
+        fh.setLevel(log_level)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
 
-        logger.propagate = False  # Quan trọng: ngăn không cho log lan truyền lên logger cha
+        logger.propagate = False
         _project_logger_configured = True
-
+        logger.info(f"Logging setup complete. Log level: {logging.getLevelName(logger.level)}. Log file: {log_file_path}")
     return logger
 
-
-# Bạn có thể thêm các hàm thiết lập khác ở đây nếu cần
-# Ví dụ: thiết lập seed cho random number generators
 def set_random_seeds(seed_value=42):
     import random
     import numpy as np

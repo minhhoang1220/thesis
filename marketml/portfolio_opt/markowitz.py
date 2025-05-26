@@ -1,94 +1,110 @@
 # marketml/portfolio_opt/markowitz.py
 import pandas as pd
+import numpy as np
 from pypfopt import EfficientFrontier, objective_functions
-# from pypfopt.expected_returns import mean_historical_return # Bạn đã tính mu ở data_preparation
-# from pypfopt.risk_models import CovarianceShrinkage # Bạn đã tính S ở data_preparation
 import logging
-
-# --- Thêm project root vào sys.path ---
-from pathlib import Path
-import sys
-PROJECT_ROOT_FOR_SCRIPT = Path(__file__).resolve().parents[2] # .ndmh/
-sys.path.insert(0, str(PROJECT_ROOT_FOR_SCRIPT))
 
 try:
     from marketml.configs import configs
-except ImportError as e:
-    print(f"CRITICAL ERROR in markowitz.py: Could not import configs. {e}")
-    sys.exit(1)
+except ImportError:
+    print("CRITICAL ERROR in markowitz.py: Could not import 'marketml.configs'.")
+    raise
 
 logger = logging.getLogger(__name__)
 
-def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame):
+def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame, logger_instance: logging.Logger = None) -> dict:
     """
-    Tối ưu hóa danh mục Markowitz.
-    mu: Expected returns (Series, index là tickers)
-    S: Covariance matrix (DataFrame, index/columns là tickers)
+    Optimizes a Markowitz portfolio based on expected returns and covariance matrix.
+
+    Args:
+        mu (pd.Series): Expected annualized returns, indexed by ticker.
+        S (pd.DataFrame): Annualized covariance matrix, indexed/columned by ticker.
+        logger_instance (logging.Logger, optional): Logger instance to use.
+
+    Returns:
+        dict: Dictionary of optimal weights {ticker: weight}, or equal weights on failure.
     """
+    current_logger = logger_instance if logger_instance else logger
+
     if mu is None or S is None or mu.empty or S.empty:
-        logger.error("Expected returns (mu) or Covariance matrix (S) is missing or empty for Markowitz.")
-        # Trả về trọng số đều nếu lỗi và có thông tin về số lượng tài sản từ S hoặc mu
+        current_logger.error("Expected returns (mu) or Covariance matrix (S) is missing or empty for Markowitz optimization.")
         num_assets = 0
         asset_list = []
         if S is not None and not S.empty:
-            num_assets = len(S.columns)
             asset_list = S.columns.tolist()
+            num_assets = len(asset_list)
         elif mu is not None and not mu.empty:
-            num_assets = len(mu.index)
             asset_list = mu.index.tolist()
+            num_assets = len(asset_list)
         
         if num_assets > 0:
-            logger.warning(f"Defaulting to equal weights for {num_assets} assets.")
-            return {ticker: 1.0/num_assets for ticker in asset_list}
+            current_logger.warning(f"Defaulting to equal weights for {num_assets} assets due to missing mu/S.")
+            return {ticker: 1.0 / num_assets for ticker in asset_list}
         else:
-            logger.error("Cannot determine number of assets for default equal weights.")
+            current_logger.error("Cannot determine number of assets for default equal weights as mu and S are unusable.")
             return {}
 
-
-    # Đảm bảo mu và S có cùng index/columns và không có NaN nào ảnh hưởng đến EF
-    common_tickers = mu.index.intersection(S.index)
-    mu_cleaned = mu.loc[common_tickers].fillna(0) # Điền 0 cho mu nếu có NaN sau khi align
-    S_cleaned = S.loc[common_tickers, common_tickers].fillna(0)
-    for ticker in S_cleaned.index: # Đảm bảo đường chéo không phải là 0
-        if S_cleaned.loc[ticker, ticker] == 0: S_cleaned.loc[ticker, ticker] = 1e-6
+    # Align mu and S to common tickers and handle NaNs
+    common_tickers = mu.index.intersection(S.index).unique()
+    if not common_tickers.any():
+        current_logger.error("No common tickers found between mu and S. Cannot optimize.")
+        return {ticker: 1.0 / len(mu.index) for ticker in mu.index} if not mu.empty else {}
 
 
-    if mu_cleaned.empty or S_cleaned.empty or len(mu_cleaned) != len(S_cleaned):
-        logger.error(f"mu_cleaned (len {len(mu_cleaned)}) or S_cleaned (shape {S_cleaned.shape}) is empty or mismatched after cleaning. Cannot optimize.")
-        num_assets = len(configs.PORTFOLIO_ASSETS) if configs.PORTFOLIO_ASSETS else 15 # Fallback
-        return {ticker: 1.0/num_assets for ticker in (configs.PORTFOLIO_ASSETS if configs.PORTFOLIO_ASSETS else mu.index)}
+    mu_cleaned = mu.loc[common_tickers].fillna(0.0)
+    S_cleaned = S.loc[common_tickers, common_tickers].fillna(0.0)
+
+    # Ensure diagonal of S_cleaned is positive
+    for ticker_idx in S_cleaned.index:
+        if S_cleaned.loc[ticker_idx, ticker_idx] <= 1e-9: # Use a small epsilon
+            S_cleaned.loc[ticker_idx, ticker_idx] = 1e-9
+            # Optionally zero out off-diagonal elements for this ticker if variance was ~0
+            # for other_ticker_idx in S_cleaned.columns:
+            #     if ticker_idx != other_ticker_idx:
+            #         S_cleaned.loc[ticker_idx, other_ticker_idx] = 0.0
+            #         S_cleaned.loc[other_ticker_idx, ticker_idx] = 0.0
 
 
-    ef = EfficientFrontier(mu_cleaned, S_cleaned, weight_bounds=configs.MARKOWITZ_WEIGHT_BOUNDS)
+    if mu_cleaned.empty or S_cleaned.empty or S_cleaned.shape[0] != S_cleaned.shape[1] or len(mu_cleaned) != len(S_cleaned):
+        current_logger.error(f"mu_cleaned (len {len(mu_cleaned)}) or S_cleaned (shape {S_cleaned.shape}) "
+                             f"is empty or mismatched after cleaning. Cannot optimize.")
+        # Fallback to equal weights based on available tickers in mu_cleaned
+        num_assets_fallback = len(mu_cleaned.index)
+        if num_assets_fallback > 0:
+            return {ticker: 1.0 / num_assets_fallback for ticker in mu_cleaned.index}
+        return {}
+        
+    current_logger.debug(f"Optimizing Markowitz for {len(mu_cleaned)} assets. Weight bounds: {configs.MARKOWITZ_WEIGHT_BOUNDS}")
 
     try:
-        # Thêm L2 regularization để giúp ổn định trọng số, đặc biệt khi có nhiều tài sản
-        # hoặc khi ma trận hiệp phương sai gần suy biến.
-        # lambda_val = 0.1 # Giá trị lambda cho L2 reg, có thể đưa vào configs
-        # ef.add_objective(objective_functions.L2_reg, gamma=lambda_val)
+        ef = EfficientFrontier(mu_cleaned, S_cleaned, weight_bounds=configs.MARKOWITZ_WEIGHT_BOUNDS)
+        
+        # Optional L2 regularization
+        if hasattr(configs, 'MARKOWITZ_L2_REG_GAMMA') and configs.MARKOWITZ_L2_REG_GAMMA > 0:
+            ef.add_objective(objective_functions.L2_reg, gamma=configs.MARKOWITZ_L2_REG_GAMMA)
+            current_logger.debug(f"Added L2 regularization with gamma={configs.MARKOWITZ_L2_REG_GAMMA}")
 
-        if configs.MARKOWITZ_OBJECTIVE == 'max_sharpe':
+        objective_choice = configs.MARKOWITZ_OBJECTIVE.lower()
+        if objective_choice == 'max_sharpe':
             weights = ef.max_sharpe(risk_free_rate=configs.MARKOWITZ_RISK_FREE_RATE)
-        elif configs.MARKOWITZ_OBJECTIVE == 'min_volatility':
+        elif objective_choice == 'min_volatility':
             weights = ef.min_volatility()
-        # Thêm các mục tiêu khác nếu cần (efficient_risk, efficient_return)
-        # elif configs.MARKOWITZ_OBJECTIVE == 'efficient_risk' and configs.MARKOWITZ_TARGET_VOLATILITY is not None:
-        #     weights = ef.efficient_risk(target_volatility=configs.MARKOWITZ_TARGET_VOLATILITY)
-        # elif configs.MARKOWITZ_OBJECTIVE == 'efficient_return' and configs.MARKOWITZ_TARGET_RETURN is not None:
-        #     weights = ef.efficient_return(target_return=configs.MARKOWITZ_TARGET_RETURN)
+        # Add other objectives like efficient_risk or efficient_return if needed,
+        # checking for corresponding target_volatility/target_return in configs
         else:
-            logger.warning(f"Markowitz objective '{configs.MARKOWITZ_OBJECTIVE}' not recognized. Defaulting to max_sharpe.")
+            current_logger.warning(f"Markowitz objective '{configs.MARKOWITZ_OBJECTIVE}' not recognized or fully specified. Defaulting to 'max_sharpe'.")
             weights = ef.max_sharpe(risk_free_rate=configs.MARKOWITZ_RISK_FREE_RATE)
         
-        cleaned_weights = ef.clean_weights() # Làm sạch trọng số (ví dụ: làm tròn số rất nhỏ về 0)
-        logger.debug(f"Optimized Markowitz weights: {cleaned_weights}")
+        cleaned_weights = ef.clean_weights()
+        current_logger.info(f"Markowitz optimization successful. Portfolio performance (expected): AnnReturn={ef.portfolio_performance()[0]:.2%}, AnnVol={ef.portfolio_performance()[1]:.2%}, Sharpe={ef.portfolio_performance()[2]:.2f}")
+        current_logger.debug(f"Optimized Markowitz weights: {cleaned_weights}")
         return cleaned_weights
+
     except Exception as e:
-        logger.error(f"Error during Markowitz optimization with PyPortfolioOpt: {e}")
-        logger.debug(f"Mu values at time of error for Markowitz: {mu_cleaned.to_dict()}") # In mu
-        logger.debug(f"Covariance matrix S at time of error for Markowitz (sample):\n{S_cleaned.iloc[:5,:5].to_string()}") # In S
-        logger.debug(f"Risk-free rate: {configs.MARKOWITZ_RISK_FREE_RATE}")
-        # Trả về trọng số đều nếu lỗi
-        num_assets = len(mu_cleaned.index)
-        logger.warning(f"Defaulting to equal weights for {num_assets} assets due to optimization error.")
-        return {ticker: 1.0/num_assets for ticker in mu_cleaned.index}
+        current_logger.error(f"Error during Markowitz optimization with PyPortfolioOpt: {e}", exc_info=True)
+        current_logger.debug(f"Mu values at time of error for Markowitz: {mu_cleaned.to_dict()}")
+        current_logger.debug(f"Covariance matrix S at time of error for Markowitz (sample):\n{S_cleaned.iloc[:min(5, S_cleaned.shape[0]), :min(5, S_cleaned.shape[1])].to_string()}")
+        
+        num_assets_error_fallback = len(mu_cleaned.index)
+        current_logger.warning(f"Defaulting to equal weights for {num_assets_error_fallback} assets due to optimization error.")
+        return {ticker: 1.0 / num_assets_error_fallback for ticker in mu_cleaned.index}

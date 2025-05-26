@@ -3,22 +3,17 @@ import pandas as pd
 import numpy as np
 import logging
 from pathlib import Path
-import sys
-import joblib
-
-PROJECT_ROOT_FOR_SCRIPT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT_FOR_SCRIPT))
 
 try:
     from marketml.configs import configs
     from marketml.portfolio_opt.rl_environment import PortfolioEnv
-    from stable_baselines3 import PPO, A2C # DDPG bị loại bỏ để đơn giản
+    from marketml.portfolio_opt.rl_scaler_handler import FinancialFeatureScaler
+    from stable_baselines3 import PPO, A2C
     from stable_baselines3.common.env_util import make_vec_env
-    from stable_baselines3.common.callbacks import EvalCallback # StopTrainingOnRewardThreshold có thể không cần thiết ban đầu
-    # from stable_baselines3.common.vec_env import SubprocVecEnv # Nếu muốn chạy song song nhiều env
+    from stable_baselines3.common.callbacks import EvalCallback
 except ImportError as e:
-    print(f"LỖI NGHIÊM TRỌNG trong rl_optimizer.py: Không thể nhập các mô-đun cần thiết. {e}")
-    sys.exit(1)
+    print(f"CRITICAL ERROR in rl_optimizer.py: Could not import necessary modules. {e}")
+    raise
 
 logger = logging.getLogger(__name__)
 
@@ -28,214 +23,197 @@ def train_rl_agent(
     classification_probs_train: pd.DataFrame = None,
     financial_features_list: list = None,
     prob_features_list: list = None,
-    initial_capital=100000,
-    transaction_cost_bps=10,
-    lookback_window_size=30,
-    rebalance_frequency_days=1,
-    total_timesteps=100000,
-    rl_algorithm="PPO",
-    model_save_path: Path = None, # Đây là đường dẫn tới model.zip, scaler sẽ được lưu cùng thư mục
-    log_dir: Path = None,
-    ppo_n_steps=2048, ppo_batch_size=64, ppo_n_epochs=10, ppo_gamma=0.99,
-    ppo_gae_lambda=0.95, ppo_clip_range=0.2, ppo_ent_coef=0.0, ppo_vf_coef=0.5,
-    ppo_max_grad_norm=0.5, ppo_learning_rate=0.0003, ppo_policy_kwargs=None,
-    reward_use_log_return=True, reward_turnover_penalty_factor=0.0
-):
-    logger.info(f"Bắt đầu huấn luyện tác nhân RL với {rl_algorithm}...")
-    # ... (log siêu tham số) ...
+    initial_capital: float = 100000,
+    transaction_cost_bps: int = 10,
+    lookback_window_size: int = 30,
+    rebalance_frequency_days: int = 1,
+    total_timesteps: int = 100000,
+    rl_algorithm: str = "PPO",
+    model_save_path: Path = None, # Full path to the .zip file for the main model
+    eval_callback_log_path: Path = None, # Separate path for EvalCallback logs/best_model
+    tensorboard_log_path: Path = None, # Separate path for TensorBoard logs
+    logger_instance: logging.Logger = None, # Optional logger instance
+    # PPO specific params from configs, with defaults if not in configs
+    ppo_n_steps: int = 2048,
+    ppo_batch_size: int = 64,
+    ppo_n_epochs: int = 10,
+    ppo_gamma: float = 0.99,
+    ppo_gae_lambda: float = 0.95,
+    ppo_clip_range: float = 0.2,
+    ppo_ent_coef: float = 0.0,
+    ppo_vf_coef: float = 0.5,
+    ppo_max_grad_norm: float = 0.5,
+    ppo_learning_rate: float = 0.0003,
+    ppo_policy_kwargs: dict = None,
+    # Reward shaping params
+    reward_use_log_return: bool = True,
+    reward_turnover_penalty_factor: float = 0.0
+) -> tuple[object | None, FinancialFeatureScaler | None]: # Returns (trained_model, fitted_scaler)
+    
+    current_logger = logger_instance if logger_instance else logger
+    current_logger.info(f"Starting RL agent training with algorithm: {rl_algorithm}")
+    current_logger.info(f"Total timesteps: {total_timesteps}")
+    # Log other important parameters if needed
 
-    fin_feat_means = None
-    fin_feat_stds = None
+    # 1. Initialize and Fit FinancialFeatureScaler
+    fitted_scaler = FinancialFeatureScaler(feature_names=financial_features_list if financial_features_list else [])
     if financial_data_train is not None and not financial_data_train.empty and financial_features_list:
-        numeric_fin_features = []
-        for feat in financial_features_list:
-            # SỬA TÊN CỘT: 'Ticker' và 'Year' theo file financial_data.csv
-            if feat in financial_data_train.columns and pd.api.types.is_numeric_dtype(financial_data_train[feat]):
-                numeric_fin_features.append(feat)
-            else:
-                logger.warning(f"Đặc trưng tài chính '{feat}' không phải dạng số hoặc không tồn tại trong financial_data_train, sẽ bị bỏ qua khỏi tính toán mean/std.")
-        
-        if numeric_fin_features:
-            temp_fin_data_for_stats = financial_data_train[numeric_fin_features].replace([np.inf, -np.inf], np.nan)
-            fin_feat_means = temp_fin_data_for_stats.mean()
-            fin_feat_stds = temp_fin_data_for_stats.std()
-            if fin_feat_stds is not None:
-                 fin_feat_stds[fin_feat_stds < 1e-6] = 1.0
-            logger.info("Đã tính toán Mean và Std cho chuẩn hóa financial features (trên tập huấn luyện):")
-            if fin_feat_means is not None: logger.info(f"Means:\n{fin_feat_means.to_string()}")
-            if fin_feat_stds is not None: logger.info(f"Stds:\n{fin_feat_stds.to_string()}")
+        current_logger.info("Fitting FinancialFeatureScaler on RL training data...")
+        fitted_scaler.fit(financial_data_train, financial_features_list)
+        if model_save_path: # Save scaler in the same directory as the primary model would be saved
+            try:
+                scaler_save_dir = model_save_path.parent
+                fitted_scaler.save(scaler_save_dir) # FinancialFeatureScaler handles its own filename
+                current_logger.info(f"Financial scaler saved in directory: {scaler_save_dir}")
+            except Exception as e_save_scl:
+                current_logger.error(f"Error saving fitted financial scaler: {e_save_scl}", exc_info=True)
+    else:
+        current_logger.info("No financial data or features for RL training, scaler will be empty (means=0, stds=1).")
 
-            # LƯU SCALERS
-            if model_save_path is not None: # Chỉ lưu nếu model_save_path được cung cấp
-                scaler_path = model_save_path.parent / "financial_scalers.joblib" # Lưu cùng thư mục với model chính
-                try:
-                    joblib.dump({'means': fin_feat_means, 'stds': fin_feat_stds}, scaler_path)
-                    logger.info(f"Đã lưu financial feature scalers vào {scaler_path}")
-                except Exception as e_save_scaler:
-                    logger.error(f"Lỗi khi lưu financial scalers: {e_save_scaler}")
-        else:
-            logger.warning("Không có đặc trưng tài chính dạng số hợp lệ để tính mean/std.")
-
+    # 2. Prepare Environment Kwargs
     env_kwargs = {
         'prices_df': prices_df_train,
         'financial_data': financial_data_train,
         'classification_probs': classification_probs_train,
         'initial_capital': initial_capital,
-        'transaction_cost_bps': transaction_cost_bps,
+        'transaction_cost_bps': transaction_cost_bps, # For env's internal reward logic
         'lookback_window_size': lookback_window_size,
-        'rebalance_frequency_days': rebalance_frequency_days,
-        'max_steps_per_episode': None,
+        'rebalance_frequency_days': rebalance_frequency_days, # Env steps by this, but backtester rebalances at its own freq
+        'max_steps_per_episode': None, # Let the data length and rebal_freq determine this
         'reward_use_log_return': reward_use_log_return,
         'reward_turnover_penalty_factor': reward_turnover_penalty_factor,
-        'financial_features': financial_features_list,
-        'prob_features': prob_features_list,
-        'financial_feature_means': fin_feat_means,
-        'financial_feature_stds': fin_feat_stds
+        'financial_features': financial_features_list if financial_features_list else [],
+        'prob_features': prob_features_list if prob_features_list else [],
+        'financial_feature_means': fitted_scaler.means, # Pass fitted means
+        'financial_feature_stds': fitted_scaler.stds,   # Pass fitted stds
+        'logger_instance': current_logger # Pass logger to env
     }
     
-    # n_envs: Số môi trường chạy song song. Hiện tại là 1.
-    # Có thể tăng lên nếu bạn có nhiều CPU cores và muốn tăng tốc huấn luyện (cần SubprocVecEnv)
-    n_envs = 1
-    vec_env = make_vec_env(PortfolioEnv, n_envs=n_envs, env_kwargs=env_kwargs, monitor_dir=str(log_dir) if log_dir else None)
+    # 3. Create Vectorized Environment
+    # monitor_dir for SB3 is for CSVs of episode rewards, lengths etc.
+    # tensorboard_log is for TensorBoard specific logs.
+    monitor_log_path = str(eval_callback_log_path / "monitor_logs") if eval_callback_log_path else None
+    if monitor_log_path: Path(monitor_log_path).mkdir(parents=True, exist_ok=True)
 
+    n_envs = 1 # For simplicity, can be increased with SubprocVecEnv
+    try:
+        vec_env = make_vec_env(PortfolioEnv, n_envs=n_envs, env_kwargs=env_kwargs, monitor_dir=monitor_log_path)
+    except Exception as e_make_env:
+        current_logger.error(f"Failed to create RL vectorized environment: {e_make_env}", exc_info=True)
+        return None, fitted_scaler # Return scaler even if env fails, as it might have been fitted
+
+
+    # 4. Setup Callbacks
     callbacks = []
-    if model_save_path:
-        # eval_freq: Đánh giá sau mỗi X bước. Số bước này nên là bội số của n_envs * ppo_n_steps / (số lần cập nhật mỗi rollout)
-        # Hoặc đơn giản là một giá trị đủ lớn, ví dụ: total_timesteps // 20
-        eval_freq_steps = max(5000, total_timesteps // 20) // n_envs # Phải chia cho n_envs
-        eval_callback = EvalCallback(vec_env, # Nên dùng một môi trường đánh giá riêng biệt nếu có thể
-                                     best_model_save_path=str(model_save_path.parent / "best_model"),
-                                     log_path=str(model_save_path.parent / "eval_logs"),
-                                     eval_freq=eval_freq_steps, # Số bước mỗi lần eval cho mỗi env
-                                     n_eval_episodes=5, # Số episode để chạy đánh giá
-                                     deterministic=True, render=False)
-        callbacks.append(eval_callback)
+    if eval_callback_log_path and model_save_path: # model_save_path's parent is where best_model.zip goes
+        best_model_save_dir = eval_callback_log_path / "best_model" # Specific dir for best_model from callback
+        eval_log_dir_for_callback = eval_callback_log_path / "eval_logs_sb3" # Specific dir for callback's own logs
 
-    if rl_algorithm.upper() == "PPO":
+        eval_freq_steps = max(1024, total_timesteps // 50) // n_envs # Eval more frequently
+        current_logger.info(f"EvalCallback configured: eval_freq={eval_freq_steps} steps (per env), "
+                            f"best_model_save_path={best_model_save_dir}")
+        try:
+            eval_env_for_callback = make_vec_env(PortfolioEnv, n_envs=1, env_kwargs=env_kwargs, monitor_dir=None) # Separate env for eval
+            eval_callback = EvalCallback(
+                eval_env_for_callback,
+                best_model_save_path=str(best_model_save_dir),
+                log_path=str(eval_log_dir_for_callback),
+                eval_freq=eval_freq_steps,
+                n_eval_episodes=max(1, 5 // n_envs), # Ensure at least 1, total reasonable number
+                deterministic=True,
+                render=False
+            )
+            callbacks.append(eval_callback)
+        except Exception as e_eval_cb:
+            current_logger.error(f"Failed to setup EvalCallback: {e_eval_cb}", exc_info=True)
+
+
+    # 5. Initialize RL Model
+    model = None
+    algo_upper = rl_algorithm.upper()
+    
+    # Ensure policy_kwargs is a dict if None
+    current_ppo_policy_kwargs = ppo_policy_kwargs if ppo_policy_kwargs is not None else {}
+
+
+    if algo_upper == "PPO":
         model = PPO(
-            "MlpPolicy",
-            vec_env,
-            verbose=1,
-            n_steps=ppo_n_steps,
-            batch_size=ppo_batch_size,
-            n_epochs=ppo_n_epochs,
-            gamma=ppo_gamma,
-            gae_lambda=ppo_gae_lambda,
-            clip_range=ppo_clip_range,
-            ent_coef=ppo_ent_coef,
-            vf_coef=ppo_vf_coef,
-            max_grad_norm=ppo_max_grad_norm,
-            learning_rate=ppo_learning_rate,
-            policy_kwargs=ppo_policy_kwargs, # Truyền từ configs
-            tensorboard_log=str(log_dir / "tb_logs") if log_dir else None,
-            seed=configs.RANDOM_SEED if hasattr(configs, 'RANDOM_SEED') else None # Thêm seed
+            "MlpPolicy", vec_env, verbose=0, # verbose=1 for more output during training
+            n_steps=ppo_n_steps, batch_size=ppo_batch_size, n_epochs=ppo_n_epochs,
+            gamma=ppo_gamma, gae_lambda=ppo_gae_lambda, clip_range=ppo_clip_range,
+            ent_coef=ppo_ent_coef, vf_coef=ppo_vf_coef, max_grad_norm=ppo_max_grad_norm,
+            learning_rate=ppo_learning_rate, policy_kwargs=current_ppo_policy_kwargs,
+            tensorboard_log=str(tensorboard_log_path) if tensorboard_log_path else None,
+            seed=configs.RANDOM_SEED if hasattr(configs, 'RANDOM_SEED') else None
         )
-    elif rl_algorithm.upper() == "A2C":
-        # A2C thường dùng n_steps nhỏ hơn
-        model = A2C(
-            "MlpPolicy",
-            vec_env,
-            verbose=1,
-            n_steps=ppo_n_steps // 10 if ppo_n_steps > 50 else 5, # A2C n_steps thường nhỏ
-            gamma=ppo_gamma,
-            gae_lambda=ppo_gae_lambda, # A2C có thể không dùng gae_lambda trực tiếp tùy vào implement
-            ent_coef=ppo_ent_coef,
-            vf_coef=ppo_vf_coef,
-            max_grad_norm=ppo_max_grad_norm,
-            learning_rate=ppo_learning_rate,
-            policy_kwargs=ppo_policy_kwargs,
-            tensorboard_log=str(log_dir / "tb_logs") if log_dir else None,
-            seed=configs.RANDOM_SEED if hasattr(configs, 'RANDOM_SEED') else None # Thêm seed
+    elif algo_upper == "A2C":
+        model = A2C( # A2C usually needs smaller n_steps
+            "MlpPolicy", vec_env, verbose=0,
+            n_steps=max(5, ppo_n_steps // 20), # A2C n_steps typically small, e.g., 5
+            gamma=ppo_gamma, gae_lambda=ppo_gae_lambda, # gae_lambda might not be used by all A2C impls
+            ent_coef=ppo_ent_coef, vf_coef=ppo_vf_coef, max_grad_norm=ppo_max_grad_norm,
+            learning_rate=ppo_learning_rate, policy_kwargs=current_ppo_policy_kwargs,
+            tensorboard_log=str(tensorboard_log_path) if tensorboard_log_path else None,
+            seed=configs.RANDOM_SEED if hasattr(configs, 'RANDOM_SEED') else None
         )
     else:
-        logger.error(f"Thuật toán RL không được hỗ trợ: {rl_algorithm}")
+        current_logger.error(f"Unsupported RL algorithm: {rl_algorithm}")
         vec_env.close()
-        return None
+        return None, fitted_scaler
 
+    # 6. Train the Model
     try:
-        model.learn(total_timesteps=total_timesteps, callback=callbacks if callbacks else None, progress_bar=True) # Thêm progress_bar
-        if model_save_path:
-            final_model_path = model_save_path.parent / f"{rl_algorithm.lower()}_final_model_{total_timesteps}steps.zip"
-            model.save(final_model_path)
-            logger.info(f"Huấn luyện mô hình RL hoàn tất. Mô hình cuối cùng được lưu vào {final_model_path}")
+        current_logger.info(f"Training RL model ({algo_upper}) for {total_timesteps} timesteps...")
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callbacks if callbacks else None,
+            progress_bar=True
+        )
+        if model_save_path: # This is the path for the *final* model after full training
+            model.save(model_save_path)
+            current_logger.info(f"RL model training complete. Final model saved to: {model_save_path.resolve()}")
             if any(isinstance(cb, EvalCallback) for cb in callbacks):
-                 logger.info(f"Mô hình tốt nhất trong quá trình đánh giá được lưu trong {model_save_path.parent / 'best_model'}")
+                 current_logger.info(f"Best model during evaluation (if any) saved in: {eval_callback_log_path / 'best_model'}")
         else:
-            logger.info("Huấn luyện mô hình RL hoàn tất. Mô hình không được lưu vì không có đường dẫn được cung cấp.")
-        return model
-    except Exception as e:
-        logger.error(f"Lỗi trong quá trình huấn luyện mô hình RL: {e}", exc_info=True)
-        return None
+            current_logger.info("RL model training complete. Model not saved as model_save_path was not provided.")
+        return model, fitted_scaler
+    except Exception as e_learn:
+        current_logger.error(f"Error during RL model training: {e_learn}", exc_info=True)
+        return None, fitted_scaler # Return scaler even if model training fails
     finally:
-        vec_env.close() # Luôn đóng môi trường
+        vec_env.close()
+        if 'eval_env_for_callback' in locals() and eval_env_for_callback is not None: # Close eval_env if created
+            eval_env_for_callback.close()
 
-# --- Ví dụ về Optuna ---
-# def objective(trial: optuna.Trial) -> float:
-#     # Định nghĩa không gian siêu tham số để Optuna tìm kiếm
-#     learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True)
-#     n_steps = trial.suggest_categorical("n_steps", [256, 512, 1024, 2048])
-#     batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])
-#     ent_coef = trial.suggest_float("ent_coef", 0.0, 0.1)
-#     # ... các siêu tham số khác ...
-#
-#     # Tạo prices_df_train, log_dir_trial, model_save_path_trial
-#     # prices_df_for_training_opt = ...
-#     # temp_log_dir = configs.RL_LOG_DIR / f"optuna_trial_{trial.number}"
-#     # temp_model_save_path = temp_log_dir / "optuna_model.zip" # Không cần lưu mỗi trial
-#
-#     model = train_rl_agent(
-#         prices_df_train=prices_df_for_training_opt, # Cần truyền dữ liệu vào đây
-#         total_timesteps=50000, # Số bước huấn luyện cho mỗi trial (nên nhỏ hơn huấn luyện chính)
-#         rl_algorithm="PPO",
-#         model_save_path=None, # Không lưu model trong quá trình optimize siêu tham số
-#         log_dir=temp_log_dir,
-#         ppo_learning_rate=learning_rate,
-#         ppo_n_steps=n_steps,
-#         ppo_batch_size=batch_size,
-#         ppo_ent_coef=ent_coef,
-#         # ... các siêu tham số khác ...
-#     )
-#
-#     if model is None:
-#         return -float('inf') # Trả về giá trị tệ nếu huấn luyện thất bại
-#
-#     # Đánh giá mô hình: Tạo một môi trường đánh giá và chạy vài episode
-#     eval_env_kwargs = { ... } # Tương tự như train_env_kwargs
-#     eval_env = make_vec_env(PortfolioEnv, n_envs=1, env_kwargs=eval_env_kwargs)
-#     mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=5, deterministic=True)
-#     eval_env.close()
-#     logger.info(f"Trial {trial.number}: Mean Reward = {mean_reward:.4f} +/- {std_reward:.4f}")
-#     return mean_reward # Optuna sẽ cố gắng tối đa hóa giá trị này
-#
-# # Để chạy Optuna:
-# # import optuna
-# # from stable_baselines3.common.evaluation import evaluate_policy
-# # study = optuna.create_study(direction="maximize")
-# # study.optimize(objective, n_trials=50) # Số lần thử
-# # print("Best trial:")
-# # trial = study.best_trial
-# # print(f"  Value: {trial.value}")
-# # print("  Params: ")
-# # for key, value in trial.params.items():
-# #     print(f"    {key}: {value}")
 
-def predict_rl_weights(model, current_env_state: np.ndarray, deterministic=True):
-    """
-    Lấy hành động (tỷ trọng) từ mô hình RL đã huấn luyện.
-    current_env_state: Quan sát trạng thái hiện tại từ môi trường.
-    """
+def predict_rl_weights(model, current_env_state: np.ndarray, deterministic: bool = True, logger_instance: logging.Logger = None) -> np.ndarray:
+    current_logger = logger_instance if logger_instance else logger
     if model is None:
-        logger.error("Mô hình RL chưa được tải. Không thể dự đoán tỷ trọng.")
-        num_elements_in_action = model.action_space.shape[0] if hasattr(model, 'action_space') else 2
-        return np.ones(num_elements_in_action) / num_elements_in_action
+        current_logger.error("RL model is None. Cannot predict weights. Returning equal weights.")
+        # Fallback to equal weights if model is not available
+        # The number of elements in action space depends on how it was defined in PortfolioEnv
+        # Assuming it's num_assets + 1 (for cash)
+        if hasattr(model, 'action_space') and model.action_space is not None: # Check if model has action_space
+            num_elements = model.action_space.shape[0]
+        else: # Fallback if model or action_space is truly None
+            num_elements = 2 # Default to a small number to avoid error, but this is a sign of bigger issue
+            current_logger.warning(f"RL model or its action_space is None. Defaulting to {num_elements} elements for equal weight prediction.")
+        return np.ones(num_elements, dtype=np.float32) / num_elements
 
-
-    action, _states = model.predict(current_env_state, deterministic=deterministic)
+    action, _ = model.predict(current_env_state, deterministic=deterministic)
     
-    predicted_weights = np.exp(action) / np.sum(np.exp(action))
+    # Apply softmax to convert raw action (logits) to probabilities (weights)
+    # Subtract max for numerical stability before exp
+    exp_action = np.exp(action - np.max(action))
+    predicted_weights = exp_action / np.sum(exp_action)
+    
+    # Ensure it's a 1D array
     if isinstance(predicted_weights, list):
         predicted_weights = np.array(predicted_weights).flatten()
     elif predicted_weights.ndim > 1:
         predicted_weights = predicted_weights.flatten()
-    logger.debug(f"RL Dự đoán hành động thô: {action}, Tỷ trọng Softmax: {predicted_weights}")
-    return predicted_weights
+        
+    current_logger.log(logging.DEBUG - 5, # Very verbose
+                       f"RL raw action: {action}, Softmax weights: "
+                       f"{[f'{w:.3f}' for w in predicted_weights]}")
+    return predicted_weights.astype(np.float32)

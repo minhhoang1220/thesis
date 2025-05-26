@@ -1,7 +1,7 @@
 import pandas as pd
-from marketml.data.loader.preprocess import standardize_data
-from marketml.data.loader.finance_loader import load_financial_data
-from marketml.data.loader.price_loader import load_price_data
+from marketml.data_handling.loader.preprocess import standardize_data
+from marketml.data_handling.loader.finance_loader import load_financial_data
+from marketml.data_handling.loader.price_loader import load_price_data
 
 def test_standardize_financial_data():
     df = load_financial_data()

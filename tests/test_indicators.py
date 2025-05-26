@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 # Đảm bảo sys.path được cấu hình đúng nếu chạy trực tiếp file này
 # Hoặc tốt nhất là chạy bằng `python -m tests.test_indicators` từ thư mục gốc
-from marketml.data.loader import preprocess
+from marketml.data_handling.loader import preprocess
 
 # --- SỬA Ở ĐÂY: Tăng dữ liệu mẫu ---
 # Tạo dữ liệu mẫu lớn hơn để các chỉ báo có thể tính toán

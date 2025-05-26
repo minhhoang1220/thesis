@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import logging
 from marketml.configs import configs
+from marketml.portfolio_opt.rl_scaler_handler import FinancialFeatureScaler
 
 logger = logging.getLogger(__name__)
 
@@ -13,456 +14,462 @@ class PortfolioEnv(gym.Env):
 
     def __init__(self,
                  prices_df: pd.DataFrame,
-                 financial_data: pd.DataFrame = None, # Đã có
-                 classification_probs: pd.DataFrame = None, # Đã có
-                 initial_capital=100000,
-                 transaction_cost_bps=10,
-                 lookback_window_size=30,
-                 rebalance_frequency_days=1,
-                 max_steps_per_episode=None,
-                 reward_use_log_return=True,
-                 reward_turnover_penalty_factor=0.0,
-                 # THIẾU CÁC THAM SỐ NÀY TRONG PHIÊN BẢN HIỆN TẠI CỦA BẠN:
+                 financial_data: pd.DataFrame = None,
+                 classification_probs: pd.DataFrame = None,
+                 initial_capital: float = 100000,
+                 transaction_cost_bps: int = 10,
+                 lookback_window_size: int = 30,
+                 rebalance_frequency_days: int = 1, # How many trading days per env step
+                 max_steps_per_episode: int = None,
+                 reward_use_log_return: bool = True,
+                 reward_turnover_penalty_factor: float = 0.0,
                  financial_features: list = None,
                  prob_features: list = None,
-                 financial_feature_means: pd.Series = None,
-                 financial_feature_stds: pd.Series = None
+                 financial_feature_means: pd.Series = None, # Means fitted on training data
+                 financial_feature_stds: pd.Series = None,  # Stds fitted on training data
+                 logger_instance: logging.Logger = None
                  ):
- # Tùy chọn: số bước tối đa trước khi một episode kết thúc
-
         super(PortfolioEnv, self).__init__()
+        self.logger = logger_instance if logger_instance else logger # Use passed logger or module logger
 
+        if prices_df.empty:
+            self.logger.error("CRITICAL: prices_df is empty. Cannot initialize PortfolioEnv.")
+            raise ValueError("prices_df cannot be empty.")
         self.prices_df = prices_df.copy()
-        # Đảm bảo index là DatetimeIndex để .loc hoạt động như mong đợi với ngày tháng
         if not isinstance(self.prices_df.index, pd.DatetimeIndex):
             try:
                 self.prices_df.index = pd.to_datetime(self.prices_df.index)
             except Exception as e:
-                logger.error(f"Không thể chuyển index của prices_df thành DatetimeIndex: {e}")
+                self.logger.error(f"Failed to convert prices_df index to DatetimeIndex: {e}", exc_info=True)
                 raise
-        
+
         self.financial_data_full = financial_data.copy() if financial_data is not None else pd.DataFrame()
         self.classification_probs_full = classification_probs.copy() if classification_probs is not None else pd.DataFrame()
 
-        # Đảm bảo financial_data_full và classification_probs_full có cột 'date' và 'ticker' nếu chúng không phải là index
-        # Và index của chúng nên là DatetimeIndex nếu 'date' không phải là cột
-        if not self.financial_data_full.empty:
-            if 'date' in self.financial_data_full.columns and not isinstance(self.financial_data_full.index, pd.DatetimeIndex):
-                try: self.financial_data_full['date'] = pd.to_datetime(self.financial_data_full['date'])
-                except: pass # Bỏ qua nếu không phải dạng ngày tháng
-            # Nếu financial_data có 'year' thay vì 'date', cần logic xử lý riêng trong _get_state
-            if 'Year' in self.financial_data_full.columns and 'Ticker' in self.financial_data_full.columns:
-                logger.info("Financial data có cột 'year' và 'ticker'.")
-                if not pd.api.types.is_numeric_dtype(self.financial_data_full['Year']):
-                    try:
-                        self.financial_data_full['Year'] = pd.to_numeric(self.financial_data_full['Year'])
-                    except ValueError:
-                        logger.error("Không thể chuyển cột 'Year' trong financial data thành số.")
-                        # Có thể raise lỗi ở đây hoặc để self.financial_data_full rỗng nếu 'Year' quan trọng
-            else:
-                 logger.warning("Financial data không có cột 'Year' và 'Ticker' như mong đợi. Sẽ không sử dụng financial features.")
-                 self.financial_data_full = pd.DataFrame()
+        # Standardize 'date' columns if they exist and are not index
+        if not self.financial_data_full.empty and 'date' in self.financial_data_full.columns:
+            try: self.financial_data_full['date'] = pd.to_datetime(self.financial_data_full['date'])
+            except: self.logger.warning("Could not parse 'date' in financial_data_full.")
+        if not self.classification_probs_full.empty and 'date' in self.classification_probs_full.columns:
+            try: self.classification_probs_full['date'] = pd.to_datetime(self.classification_probs_full['date'])
+            except: self.logger.warning("Could not parse 'date' in classification_probs_full.")
 
-
-        if not self.classification_probs_full.empty:
-            if 'date' in self.classification_probs_full.columns and not isinstance(self.classification_probs_full.index, pd.DatetimeIndex):
-                try: self.classification_probs_full['date'] = pd.to_datetime(self.classification_probs_full['date'])
-                except: pass
+        # Ensure 'Year' in financial_data is numeric if present
+        if not self.financial_data_full.empty and 'Year' in self.financial_data_full.columns:
+            if not pd.api.types.is_numeric_dtype(self.financial_data_full['Year']):
+                try:
+                    self.financial_data_full['Year'] = pd.to_numeric(self.financial_data_full['Year'])
+                except ValueError:
+                    self.logger.error("Failed to convert 'Year' in financial_data_full to numeric. Financial features may fail.")
+                    self.financial_data_full = pd.DataFrame() # Invalidate if crucial column is bad
 
         self.tickers = self.prices_df.columns.tolist()
+        if not self.tickers:
+            self.logger.error("CRITICAL: No tickers found in prices_df. Cannot initialize PortfolioEnv.")
+            raise ValueError("prices_df must have tickers as columns.")
         self.num_assets = len(self.tickers)
-        self.initial_capital = initial_capital
+
+        self.initial_capital = float(initial_capital)
         self.transaction_cost_pct = transaction_cost_bps / 10000.0
-        self.lookback_window_size = lookback_window_size
-        self.rebalance_frequency_days = rebalance_frequency_days # Số ngày giao dịch mỗi bước tái cân bằng
+        self.lookback_window_size = int(lookback_window_size)
+        self.rebalance_frequency_days = int(rebalance_frequency_days)
 
         self.reward_use_log_return = reward_use_log_return
-        self.reward_turnover_penalty_factor = reward_turnover_penalty_factor
+        self.reward_turnover_penalty_factor = float(reward_turnover_penalty_factor)
 
         self.financial_features_to_use = financial_features if financial_features else []
         self.prob_features_to_use = prob_features if prob_features else []
-        
-        # Lưu trữ mean/std để chuẩn hóa
-        self.fin_feat_means = financial_feature_means
-        self.fin_feat_stds = financial_feature_stds
-        if self.financial_features_to_use and (self.fin_feat_means is None or self.fin_feat_stds is None):
-            logger.warning("Đang sử dụng financial features nhưng financial_feature_means/stds không được cung cấp. Các đặc trưng sẽ không được chuẩn hóa đúng cách!")
 
-        
-        num_financial_features_per_asset = len(self.financial_features_to_use)
+        # Initialize internal scaler for financial features
+        self.internal_fin_scaler = None
+        if self.financial_features_to_use:
+            if financial_feature_means is not None and financial_feature_stds is not None:
+                self.internal_fin_scaler = FinancialFeatureScaler(
+                    feature_names=self.financial_features_to_use,
+                    means=financial_feature_means,
+                    stds=financial_feature_stds
+                )
+                self.logger.info("PortfolioEnv: Initialized internal FinancialFeatureScaler with provided means/stds.")
+            else:
+                self.logger.warning("PortfolioEnv: Financial features are specified, but means/stds for scaling are missing. Features will not be scaled, or an empty scaler will be used.")
+                # Create an empty scaler so transform doesn't fail, but it won't scale
+                self.internal_fin_scaler = FinancialFeatureScaler(feature_names=self.financial_features_to_use)
+
+
+        num_fin_features_per_asset = len(self.financial_features_to_use)
         num_prob_features_per_asset = len(self.prob_features_to_use)
 
-        if self.prices_df.empty or len(self.prices_df) < self.lookback_window_size + self.rebalance_frequency_days:
-            logger.error(
-                f"Dữ liệu giá không đủ. Số dòng: {len(self.prices_df)}, "
-                f"Yêu cầu tối thiểu: {self.lookback_window_size + self.rebalance_frequency_days}"
-            )
-            raise ValueError("Dữ liệu giá không đủ cho cửa sổ nhìn lại và tần suất tái cân bằng đã cho.")
+        min_data_len_needed = self.lookback_window_size + self.rebalance_frequency_days
+        if len(self.prices_df) < min_data_len_needed:
+            self.logger.error(f"Insufficient price data. Rows: {len(self.prices_df)}, Minimum needed: {min_data_len_needed}.")
+            raise ValueError("Insufficient price data for lookback and rebalance frequency.")
         
-        self.action_space = spaces.Box(low=-1, high=1, shape=(self.num_assets + 1,), dtype=np.float32)
+        # Action: weights for assets + cash (normalized by softmax later)
+        self.action_space = spaces.Box(low=-5, high=5, shape=(self.num_assets + 1,), dtype=np.float32) # Wider range for raw NN output
 
-        # Cập nhật state_dim
+        # Observation space dimensions
         price_hist_dim = self.num_assets * self.lookback_window_size
-        weights_dim = self.num_assets + 1
-        cash_ratio_dim = 1
-        ptf_value_dim = 1
-        financial_data_dim = self.num_assets * num_financial_features_per_asset
+        weights_dim = self.num_assets + 1 # Current weights including cash
+        # cash_ratio_dim = 1 # Already included in weights_dim[-1]
+        ptf_value_dim = 1  # Normalized portfolio value
+        financial_data_dim = self.num_assets * num_fin_features_per_asset
         prob_data_dim = self.num_assets * num_prob_features_per_asset
-        state_dim = price_hist_dim + weights_dim + cash_ratio_dim + ptf_value_dim + financial_data_dim + prob_data_dim
+        
+        state_dim = price_hist_dim + weights_dim + ptf_value_dim + financial_data_dim + prob_data_dim
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(state_dim,), dtype=np.float32)
-        logger.info(f"Observation space dimension: {state_dim} "
-                    f"(PriceHist: {price_hist_dim}, Weights: {weights_dim}, CashRatio: {cash_ratio_dim}, PtfVal: {ptf_value_dim}, "
-                    f"Financial: {financial_data_dim} ({num_financial_features_per_asset} per asset), Probs: {prob_data_dim} ({num_prob_features_per_asset} per asset))")
+        
+        self.logger.info(f"Observation space dimension: {state_dim} ("
+                    f"PriceHist({self.lookback_window_size}d): {price_hist_dim}, Weights: {weights_dim}, PtfValue_Norm: {ptf_value_dim}, "
+                    f"Financial({num_fin_features_per_asset}pA): {financial_data_dim}, Probs({num_prob_features_per_asset}pA): {prob_data_dim})")
         
         self.current_step = 0
-        self.current_weights = np.zeros(self.num_assets + 1, dtype=np.float32)
-        self.current_weights[-1] = 1.0
+        self._current_prices_idx = self.lookback_window_size -1 # Start so first _get_state uses prices up to this index for history
         self.portfolio_value = self.initial_capital
-        self._current_prices_idx = self.lookback_window_size # Index số nguyên cho iloc
-        
-        self.max_steps_config = max_steps_per_episode
-        if self.max_steps_config is None:
+        self.current_weights = np.zeros(self.num_assets + 1, dtype=np.float32)
+        self.current_weights[-1] = 1.0 # Start with all cash
+
+        if max_steps_per_episode is None:
             if self.rebalance_frequency_days <= 0:
-                logger.error("rebalance_frequency_days phải lớn hơn 0.")
-                raise ValueError("rebalance_frequency_days phải lớn hơn 0.")
-            min_data_points_needed = self.lookback_window_size + self.rebalance_frequency_days
-            if len(self.prices_df) < min_data_points_needed: self.max_steps = 0
-            else: self.max_steps = (len(self.prices_df) - self.lookback_window_size) // self.rebalance_frequency_days
-        else: self.max_steps = self.max_steps_config
-        
-        # Thêm logging chi tiết
-        logger.info(
-            f"PortfolioEnv khởi tạo: "
-            f"Số dòng prices_df: {len(self.prices_df)}, "
-            f"Ngày bắt đầu prices_df: {self.prices_df.index.min().date() if not self.prices_df.empty and isinstance(self.prices_df.index, pd.DatetimeIndex) else 'N/A'}, "
-            f"Ngày kết thúc prices_df: {self.prices_df.index.max().date() if not self.prices_df.empty and isinstance(self.prices_df.index, pd.DatetimeIndex) else 'N/A'}, "
-            f"Lookback: {self.lookback_window_size}, Rebal Freq: {self.rebalance_frequency_days}. "
-            f"Max_steps_config: {self.max_steps_config}, Calculated max_steps: {self.max_steps}"
-        )
-        if self.max_steps <= 0 :
-            logger.error(f"Calculated max_steps ({self.max_steps}) không hợp lệ. Kiểm tra độ dài prices_df và các tham số.")
-            raise ValueError(f"Calculated max_steps ({self.max_steps}) không hợp lệ.")
-        
-        self.episode_return_history = []
-        self.episode_portfolio_log_returns = [] # Để tính Sharpe
-
-
-    def _get_state(self):
-        """Xây dựng quan sát trạng thái."""
-        # 1. Thay đổi giá quá khứ (lợi nhuận)
-        # Đảm bảo _current_prices_idx hợp lệ để cắt lát
-        start_idx_price = self._current_prices_idx - self.lookback_window_size
-        end_idx_price = self._current_prices_idx
-        if start_idx_price < 0: effective_start_idx_price = 0; num_missing_rows_price = abs(start_idx_price)
-        else: effective_start_idx_price = start_idx_price; num_missing_rows_price = 0
-
-        expected_len_price = self.num_assets * self.lookback_window_size
-        if end_idx_price > len(self.prices_df) or effective_start_idx_price >= end_idx_price or effective_start_idx_price < 0 : # Thêm check effective_start_idx_price < 0
-             logger.warning(f"Chỉ số không hợp lệ cho price history: effective_start={effective_start_idx_price}, end={end_idx_price}. Padding zeros.")
-             price_history_features = np.zeros(expected_len_price, dtype=np.float32)
+                self.logger.error("rebalance_frequency_days must be positive.")
+                raise ValueError("rebalance_frequency_days must be positive.")
+            # Max steps is number of rebalance periods possible
+            self.max_steps = (len(self.prices_df) - self.lookback_window_size) // self.rebalance_frequency_days
         else:
-            price_history = self.prices_df.iloc[effective_start_idx_price:end_idx_price][self.tickers]
-            price_history_returns_raw = price_history.pct_change()
-            if not price_history_returns_raw.empty: price_history_returns_raw.iloc[0] = price_history_returns_raw.iloc[0].fillna(0.0)
-            price_history_returns_filled = price_history_returns_raw.fillna(0.0).values.flatten().astype(np.float32)
-            
-            current_len = len(price_history_returns_filled)
-            if num_missing_rows_price > 0: # Prepend zeros if effective_start_idx was 0 due to negative start_idx_price
-                padding_zeros_price = np.zeros(self.num_assets * num_missing_rows_price, dtype=np.float32)
-                price_history_features = np.concatenate((padding_zeros_price, price_history_returns_filled))
-                current_len = len(price_history_features) # Update current_len after prepending
-            else:
-                price_history_features = price_history_returns_filled
-            
-            if current_len < expected_len_price: # Append zeros if still shorter
-                price_history_features = np.concatenate((price_history_features, np.zeros(expected_len_price - current_len, dtype=np.float32)))
-            elif current_len > expected_len_price: # Truncate if longer
-                price_history_features = price_history_features[:expected_len_price]
-
-        # 2. Current weights, cash ratio, portfolio value
-        current_weights_features = self.current_weights.astype(np.float32)
-        cash_ratio_feature = np.array([self.current_weights[-1]], dtype=np.float32)
-        normalized_portfolio_value_feature = np.array([self.portfolio_value / self.initial_capital], dtype=np.float32)
+            self.max_steps = int(max_steps_per_episode)
         
-        current_date_for_features = self.prices_df.index[self._current_prices_idx]
+        if self.max_steps <= 0 :
+            self.logger.error(f"Calculated max_steps ({self.max_steps}) is not positive. Check prices_df length, lookback, and rebalance frequency.")
+            raise ValueError(f"Calculated max_steps ({self.max_steps}) is not positive.")
+        
+        self.logger.info(
+            f"PortfolioEnv initialized: Tickers: {self.num_assets}, Lookback: {self.lookback_window_size}, "
+            f"Rebal Freq (days): {self.rebalance_frequency_days}, Max episode steps: {self.max_steps}. "
+            f"Price data from {self.prices_df.index.min().date()} to {self.prices_df.index.max().date()}."
+        )
+        self.episode_return_history = []
+        self.episode_portfolio_log_returns = []
 
-        # 3. Financial data features
-        expected_fin_len = self.num_assets * len(self.financial_features_to_use)
-        financial_features_flat_list = []
-        if not self.financial_data_full.empty and self.financial_features_to_use:
-            target_year = current_date_for_features.year - 1
+    def _get_state(self) -> np.ndarray:
+        # Ensure _current_prices_idx is valid
+        if not (self.lookback_window_size -1 <= self._current_prices_idx < len(self.prices_df)):
+            self.logger.error(f"Invalid _current_prices_idx: {self._current_prices_idx} for prices_df length {len(self.prices_df)} and lookback {self.lookback_window_size}.")
+            # This state indicates a serious issue, return a zero state
+            return np.zeros(self.observation_space.shape, dtype=np.float32)
+
+        # 1. Price history features (log returns of lookback_window_size)
+        start_idx = self._current_prices_idx - self.lookback_window_size + 1
+        end_idx = self._current_prices_idx + 1 # Slice includes end_idx-1
+        
+        price_history_slice = self.prices_df.iloc[start_idx:end_idx][self.tickers]
+        # Log returns are generally preferred for stationarity in RL states for prices
+        log_returns_history = np.log(price_history_slice / price_history_slice.shift(1)).fillna(0.0)
+        price_features = log_returns_history.values.flatten().astype(np.float32) # Shape: (num_assets * lookback_window_size)
+
+        # 2. Current portfolio weights (including cash)
+        weights_features = self.current_weights.astype(np.float32)
+
+        # 3. Normalized portfolio value
+        ptf_value_feature = np.array([self.portfolio_value / self.initial_capital], dtype=np.float32)
+        
+        # Current date for fetching financial and probability features
+        current_date_for_aux_features = self.prices_df.index[self._current_prices_idx]
+
+        # 4. Financial data features
+        financial_features_all_assets = []
+        if self.financial_features_to_use and self.internal_fin_scaler:
+            target_fin_year = current_date_for_aux_features.year - 1 # Financials from previous year-end
             for ticker in self.tickers:
-                asset_fin_features_raw = np.zeros(len(self.financial_features_to_use), dtype=np.float32)
-                # SỬA TÊN CỘT: 'Ticker' và 'Year' theo file financial_data.csv
-                ticker_year_data = self.financial_data_full[
-                    (self.financial_data_full['Ticker'] == ticker) &
-                    (self.financial_data_full['Year'] == target_year)
-                ]
-                if not ticker_year_data.empty:
-                    record = ticker_year_data.iloc[0]
-                    for j, feature_name in enumerate(self.financial_features_to_use):
-                        raw_value = record.get(feature_name, 0.0)
-                        try:
-                            numeric_value = float(raw_value)
-                        except (ValueError, TypeError):
-                            logger.warning(f"Không thể chuyển đổi financial feature '{feature_name}' của {ticker} (giá trị: {raw_value}) thành float. Dùng 0.0.")
-                            numeric_value = 0.0
+                asset_fin_data_series = pd.Series(dtype=float, index=self.financial_features_to_use) # Ensure all features present, default NaN
+                if not self.financial_data_full.empty and 'Ticker' in self.financial_data_full.columns and 'Year' in self.financial_data_full.columns:
+                    ticker_year_data = self.financial_data_full[
+                        (self.financial_data_full['Ticker'] == ticker) &
+                        (self.financial_data_full['Year'] == target_fin_year)
+                    ]
+                    if not ticker_year_data.empty:
+                        # Populate asset_fin_data_series with values from the record
+                        record = ticker_year_data.iloc[0]
+                        for feat in self.financial_features_to_use:
+                            asset_fin_data_series[feat] = record.get(feat) # Keeps NaN if feature not in record
 
-                        if self.fin_feat_means is not None and self.fin_feat_stds is not None and \
-                           feature_name in self.fin_feat_means and feature_name in self.fin_feat_stds and \
-                           pd.notna(self.fin_feat_stds[feature_name]) and self.fin_feat_stds[feature_name] > 1e-6:
-                            mean_val = self.fin_feat_means[feature_name]
-                            std_val = self.fin_feat_stds[feature_name]
-                            asset_fin_features_raw[j] = (numeric_value - mean_val) / std_val
-                        else:
-                            asset_fin_features_raw[j] = numeric_value
-                financial_features_flat_list.extend(asset_fin_features_raw)
-        
-        financial_features_final_array = np.array(financial_features_flat_list, dtype=np.float32)
-        if financial_features_final_array.size != expected_fin_len: # Đảm bảo kích thước đúng ngay cả khi list rỗng
-            logger.debug(f"Kích thước financial_features_final_array ({financial_features_final_array.size}) không khớp mong đợi ({expected_fin_len}). Sẽ dùng mảng zeros.")
-            financial_features_final_array = np.zeros(expected_fin_len, dtype=np.float32)
+                scaled_asset_fin_features = self.internal_fin_scaler.transform(asset_fin_data_series)
+                financial_features_all_assets.extend(scaled_asset_fin_features)
+        else: # No financial features or no scaler
+            financial_features_all_assets = np.zeros(self.num_assets * len(self.financial_features_to_use), dtype=np.float32)
+        financial_features_array = np.array(financial_features_all_assets, dtype=np.float32)
 
 
-        # 4. Classification probabilities features
-        expected_prob_len = self.num_assets * len(self.prob_features_to_use)
-        prob_features_flat_list = []
-        if not self.classification_probs_full.empty and self.prob_features_to_use:
+        # 5. Classification probabilities features
+        prob_features_all_assets = []
+        if self.prob_features_to_use and not self.classification_probs_full.empty:
+            prob_col_name_base = f"prob_increase_{configs.SOFT_SIGNAL_MODEL_NAME}" # Assuming this exists from configs
+            # Verify the actual column name exists
+            actual_prob_col_names = [col for col in self.classification_probs_full.columns if prob_col_name_base in col]
+            if not actual_prob_col_names and self.prob_features_to_use: # If specific prob features are listed but base name not found
+                 self.logger.warning(f"Base probability column '{prob_col_name_base}' not found. Will use 0.5 for probabilities.")
+            
             for ticker in self.tickers:
-                relevant_ticker_probs = self.classification_probs_full[
-                    (self.classification_probs_full['ticker'] == ticker) &
-                    (self.classification_probs_full['date'] <= current_date_for_features) # 'date' là cột trong classification_probs_full
-                ]
-                asset_prob_features = np.full(len(self.prob_features_to_use), 0.5, dtype=np.float32)
-                if not relevant_ticker_probs.empty:
-                    record = relevant_ticker_probs.sort_values('date', ascending=False).iloc[0]
-                    for j, feature_name in enumerate(self.prob_features_to_use):
-                        asset_prob_features[j] = float(record.get(feature_name, 0.5))
-                prob_features_flat_list.extend(asset_prob_features)
-        
-        prob_features_final_array = np.array(prob_features_flat_list, dtype=np.float32)
-        if prob_features_final_array.size != expected_prob_len:
-            logger.debug(f"Kích thước prob_features_final_array ({prob_features_final_array.size}) không khớp mong đợi ({expected_prob_len}). Sẽ dùng mảng 0.5.")
-            prob_features_final_array = np.full(expected_prob_len, 0.5, dtype=np.float32)
+                asset_probs = np.full(len(self.prob_features_to_use), 0.5, dtype=np.float32) # Default to 0.5 (neutral)
+                if 'date' in self.classification_probs_full.columns and 'ticker' in self.classification_probs_full.columns:
+                    relevant_ticker_probs = self.classification_probs_full[
+                        (self.classification_probs_full['ticker'] == ticker) &
+                        (self.classification_probs_full['date'] <= current_date_for_aux_features)
+                    ]
+                    if not relevant_ticker_probs.empty:
+                        latest_record = relevant_ticker_probs.sort_values('date', ascending=False).iloc[0]
+                        for idx, feature_name_pattern in enumerate(self.prob_features_to_use): # e.g. "prob_increase_XGBoost"
+                            # Try to find the exact match or a column containing the pattern
+                            col_to_use = feature_name_pattern
+                            if col_to_use not in latest_record.index: # If exact pattern not a column
+                                found_cols = [c for c in latest_record.index if feature_name_pattern in c]
+                                if found_cols: col_to_use = found_cols[0]
+                                else: col_to_use = None
 
+                            if col_to_use and pd.notna(latest_record.get(col_to_use)):
+                                try: asset_probs[idx] = float(latest_record.get(col_to_use))
+                                except (ValueError,TypeError): self.logger.warning(f"Could not convert prob feature {col_to_use} to float for {ticker}")
+                prob_features_all_assets.extend(asset_probs)
+        else: # No probability features or no probability data
+             prob_features_all_assets = np.zeros(self.num_assets * len(self.prob_features_to_use), dtype=np.float32)
+        prob_features_array = np.array(prob_features_all_assets, dtype=np.float32)
 
-        state_parts = [
-            price_history_features,
-            current_weights_features,
-            cash_ratio_feature,
-            normalized_portfolio_value_feature,
-            financial_features_final_array, # Luôn nối, ngay cả khi nó là mảng zeros
-            prob_features_final_array      # Luôn nối, ngay cả khi nó là mảng 0.5s
-        ]
-        state = np.concatenate(state_parts)
+        # Concatenate all feature parts
+        state = np.concatenate([
+            price_features,
+            weights_features,
+            ptf_value_feature,
+            financial_features_array,
+            prob_features_array
+        ]).astype(np.float32)
 
         if state.shape[0] != self.observation_space.shape[0]:
-            logger.error(f"Lỗi kích thước trạng thái CUỐI CÙNG! Mong đợi {self.observation_space.shape[0]}, nhận được {state.shape[0]}. ")
-            # ... (log chi tiết hơn các thành phần nếu cần)
+            self.logger.critical(f"STATE SHAPE MISMATCH! Expected {self.observation_space.shape[0]}, got {state.shape[0]}. "
+                                 f"Price: {price_features.shape}, Wts: {weights_features.shape}, PtfVal: {ptf_value_feature.shape}, "
+                                 f"Fin: {financial_features_array.shape}, Prob: {prob_features_array.shape}")
+            # Pad or truncate if desperate, but this indicates a fundamental issue.
+            # For now, return a zero state to avoid crashing SB3, but this needs fixing.
             return np.zeros(self.observation_space.shape, dtype=np.float32)
         return state
 
     def reset(self, seed=None, options=None):
-        super().reset(seed=seed)
+        super().reset(seed=seed) # Handles seeding for reproducibility
         self.current_step = 0
-        self._current_prices_idx = self.lookback_window_size
+        # Start at an index where a full lookback window is available
+        self._current_prices_idx = self.lookback_window_size -1 # iloc uses 0-based index, so index for Nth item is N-1
         self.portfolio_value = self.initial_capital
         self.current_weights = np.zeros(self.num_assets + 1, dtype=np.float32)
-        self.current_weights[-1] = 1.0
-        self.episode_return_history = [] # Lưu tổng phần thưởng của episode
-        self.episode_portfolio_log_returns = [] # Lưu log return của danh mục ở mỗi bước
+        self.current_weights[-1] = 1.0 # Start with 100% cash
+        
+        self.episode_return_history = []
+        self.episode_portfolio_log_returns = []
 
         observation = self._get_state()
-        info = {}
-        logger.debug(f"Env Reset: Chỉ số bắt đầu {self._current_prices_idx}, Giá trị danh mục {self.portfolio_value:.2f}")
+        info = {} # Additional info to return, if any
+        self.logger.debug(f"Env Reset: Start prices_idx={self._current_prices_idx}, Portfolio Value={self.portfolio_value:.2f}")
         return observation, info
 
     def step(self, action: np.ndarray):
-        """
-        action: đầu ra thô từ mạng policy cho tỷ trọng mục tiêu mới (tài sản + tiền mặt)
-        """
-        # 1. Xác định tỷ trọng mục tiêu từ hành động (ví dụ: áp dụng softmax)
-        target_weights_raw = action
-        target_weights = np.exp(target_weights_raw) / np.sum(np.exp(target_weights_raw))
+        """Execute one step in the environment given the action."""
+        # 1. Process action to get target weights (with numerical stability checks)
+        if np.isnan(action).any() or np.isinf(action).any():
+            self.logger.warning(f"NaN or Inf in raw action: {action}. Using equal weights for this step.")
+            target_weights = np.ones(self.num_assets + 1, dtype=np.float32) / (self.num_assets + 1)
+        else:
+            exp_action = np.exp(action - np.max(action))  # Subtract max for numerical stability
+            target_weights = exp_action / np.sum(exp_action)
         target_weights = target_weights.astype(np.float32)
 
-        # 2. Tính toán chi phí giao dịch
-        # Giá trị tài sản cần mua/bán
-        # Giá trị tài sản hiện tại (không bao gồm tiền mặt)
-        portfolio_value_before_trade_and_cost = self.portfolio_value # Lưu giá trị trước khi hành động
+        portfolio_value_before_trade = self.portfolio_value
         prices_at_rebalance_start = self.prices_df.iloc[self._current_prices_idx][self.tickers].values
-        
-        # Kiểm tra giá NaN
+
+        # Handle NaN or non-positive prices at rebalance start
         if np.isnan(prices_at_rebalance_start).any() or np.any(prices_at_rebalance_start <= 0):
-            logger.warning(f"Giá NaN hoặc <=0 tại bước {self.current_step}, idx {self._current_prices_idx}. Giữ nguyên danh mục.")
-            # Không giao dịch, giá trị danh mục không đổi so với kỳ trước (ngoại trừ biến động giá nếu có)
-            # Để đơn giản, coi như không có thay đổi giá trị nếu không giao dịch được
-            step_portfolio_log_return = 0.0 # Không có lợi nhuận/lỗ từ giao dịch này
+            self.logger.warning(
+                f"NaN or non-positive prices at rebalance start (idx {self._current_prices_idx}). "
+                "No trades executed, holding previous weights."
+            )
             transaction_costs = 0.0
-            # Cần cập nhật giá trị danh mục dựa trên biến động giá nếu không giao dịch
-            # For simplicity now, if cannot trade, assume portfolio value from market move is based on *current_weights*
-            next_prices_idx_no_trade = self._current_prices_idx + self.rebalance_frequency_days
-            if next_prices_idx_no_trade < len(self.prices_df):
-                prices_at_rebalance_end_no_trade = self.prices_df.iloc[next_prices_idx_no_trade][self.tickers].values
-                if not np.isnan(prices_at_rebalance_end_no_trade).any() and not np.any(prices_at_rebalance_end_no_trade <= 0):
-                    # shares based on current_weights (before trying to apply new action)
-                    current_shares = np.zeros_like(self.current_weights[:-1])
-                    valid_prices_mask_current = prices_at_rebalance_start > 0 # Use start prices for share calculation
-                    current_shares[valid_prices_mask_current] = (self.current_weights[:-1][valid_prices_mask_current] * portfolio_value_before_trade_and_cost) / prices_at_rebalance_start[valid_prices_mask_current]
-
-                    value_of_assets_eod = np.sum(current_shares * prices_at_rebalance_end_no_trade)
-                    cash_value = self.current_weights[-1] * portfolio_value_before_trade_and_cost
-                    self.portfolio_value = value_of_assets_eod + cash_value
-                    if portfolio_value_before_trade_and_cost > 1e-6:
-                        step_portfolio_log_return = np.log(self.portfolio_value / portfolio_value_before_trade_and_cost)
-                else: # Cannot determine next prices either
-                    pass # self.portfolio_value remains portfolio_value_before_trade_and_cost
-            # Weights không thay đổi
-        else:
-            current_asset_values = self.current_weights[:-1] * portfolio_value_before_trade_and_cost
-            target_asset_dollar_values = target_weights[:-1] * portfolio_value_before_trade_and_cost # Mục tiêu giá trị $ cho tài sản
-
-            trades_value = np.sum(np.abs(target_asset_dollar_values - current_asset_values))
-            transaction_costs = trades_value * self.transaction_cost_pct
-            portfolio_value_after_costs = portfolio_value_before_trade_and_cost - transaction_costs
-
-            # Tiền mặt sau khi phân bổ cho tài sản mục tiêu và trừ chi phí
-            cash_after_asset_alloc_and_costs = portfolio_value_after_costs * target_weights[-1]
-
-            # Giá trị tài sản mục tiêu sau chi phí
-            assets_value_after_costs = portfolio_value_after_costs * (1 - target_weights[-1])
-
-
-            next_prices_idx = self._current_prices_idx + self.rebalance_frequency_days
-            if next_prices_idx >= len(self.prices_df):
-                self.portfolio_value = portfolio_value_after_costs # Không có biến động giá thêm
-                step_portfolio_log_return = np.log(self.portfolio_value / portfolio_value_before_trade_and_cost) if portfolio_value_before_trade_and_cost > 1e-6 else 0.0
-                self.current_weights = target_weights # Cập nhật về tỷ trọng mục tiêu
-
-                terminated = True
-                truncated = False
-                self.episode_portfolio_log_returns.append(step_portfolio_log_return)
-                reward = step_portfolio_log_return
-                if self.reward_turnover_penalty_factor > 0 and portfolio_value_before_trade_and_cost > 1e-6:
-                     turnover_ratio = trades_value / portfolio_value_before_trade_and_cost
-                     reward -= self.reward_turnover_penalty_factor * turnover_ratio
-                self.episode_return_history.append(reward)
-                terminated = True; truncated = False
-                info = {'portfolio_value': self.portfolio_value, 'weights': self.current_weights, 'transaction_costs': transaction_costs, 'step_reward': reward, 'raw_log_return': step_portfolio_log_return}
-                if terminated: info['cumulative_return'] = np.sum(self.episode_return_history); info['sharpe_ratio'] = self.calculate_sharpe(self.episode_portfolio_log_returns)
-                return self._get_state(), reward, terminated, truncated, info
-
-            prices_at_rebalance_end = self.prices_df.iloc[next_prices_idx][self.tickers].values
-            if np.isnan(prices_at_rebalance_end).any() or np.any(prices_at_rebalance_end <= 0):
-                 logger.warning(f"Giá NaN hoặc <=0 ở cuối kỳ tái cân bằng (idx {next_prices_idx}). Dùng giá đầu kỳ.")
-                 prices_at_rebalance_end = prices_at_rebalance_start
-
-        # Số lượng cổ phiếu dựa trên giá trị tài sản mục tiêu sau chi phí và giá đầu kỳ
-            shares = np.zeros_like(target_weights[:-1])
-            valid_prices_mask_start = prices_at_rebalance_start > 0
-            # assets_value_after_costs là tổng giá trị $ dự định cho các tài sản
-            # target_weights[:-1] / np.sum(target_weights[:-1]) là tỷ trọng tương đối của từng tài sản trong phần tài sản
-            if np.sum(target_weights[:-1]) > 1e-9: # Tránh chia cho 0 nếu không có tài sản nào
-                relative_asset_weights = target_weights[:-1] / np.sum(target_weights[:-1])
-                dollar_value_per_asset_target = relative_asset_weights * assets_value_after_costs
-                shares[valid_prices_mask_start] = dollar_value_per_asset_target[valid_prices_mask_start] / prices_at_rebalance_start[valid_prices_mask_start]
             
-            value_of_assets_at_step_end = np.sum(shares * prices_at_rebalance_end)
-            self.portfolio_value = value_of_assets_at_step_end + cash_after_asset_alloc_and_costs
-
-            step_portfolio_log_return = 0.0
-            if portfolio_value_before_trade_and_cost > 1e-6:
-                step_portfolio_log_return = np.log(self.portfolio_value / portfolio_value_before_trade_and_cost)
-
-            if self.portfolio_value > 1e-6:
-                self.current_weights[:-1] = (shares * prices_at_rebalance_end) / self.portfolio_value
-                self.current_weights[-1] = cash_after_asset_alloc_and_costs / self.portfolio_value
-                # Đảm bảo tổng tỷ trọng là 1 do lỗi làm tròn số
-                self.current_weights /= np.sum(self.current_weights)
+            # Calculate portfolio value change from market movement of current holdings
+            next_prices_idx = self._current_prices_idx + self.rebalance_frequency_days
+            if next_prices_idx < len(self.prices_df):
+                prices_at_rebalance_end = self.prices_df.iloc[next_prices_idx][self.tickers].values
+                if not (np.isnan(prices_at_rebalance_end).any() or np.any(prices_at_rebalance_end <= 0)):
+                    # Calculate asset values based on current shares and price changes
+                    current_shares = np.zeros_like(self.current_weights[:-1])
+                    valid_prices_mask = prices_at_rebalance_start > 0
+                    current_shares[valid_prices_mask] = (
+                        self.current_weights[:-1][valid_prices_mask] * portfolio_value_before_trade
+                    ) / prices_at_rebalance_start[valid_prices_mask]
+                    
+                    value_of_assets_eod = np.sum(current_shares * prices_at_rebalance_end)
+                    cash_value = self.current_weights[-1] * portfolio_value_before_trade
+                    self.portfolio_value = value_of_assets_eod + cash_value
+            
+            # current_weights remain unchanged
+        else:
+            # Calculate transaction costs
+            current_asset_values = self.current_weights[:-1] * portfolio_value_before_trade
+            target_asset_values = target_weights[:-1] * portfolio_value_before_trade
+            trades_value = np.sum(np.abs(target_asset_values - current_asset_values))
+            transaction_costs = trades_value * self.transaction_cost_pct
+            
+            # Apply transaction costs
+            portfolio_value_after_costs = portfolio_value_before_trade - transaction_costs
+            
+            # Handle bankruptcy case
+            if portfolio_value_after_costs < 0:
+                self.logger.warning(
+                    f"Portfolio value became negative ({portfolio_value_after_costs:.2f}) after transaction costs. "
+                    "Setting to 0."
+                )
+                portfolio_value_after_costs = 0.0
+                self.current_weights = np.zeros(self.num_assets + 1, dtype=np.float32)
+                self.current_weights[-1] = 1.0  # All cash (which is 0)
+            
+            # Calculate new cash position
+            cash_after_trade = portfolio_value_after_costs * target_weights[-1]
+            assets_value_after_costs = portfolio_value_after_costs - cash_after_trade
+            
+            # Calculate new shares for each asset
+            shares = np.zeros_like(target_weights[:-1])
+            valid_prices_mask = prices_at_rebalance_start > 0
+            
+            if np.sum(target_weights[:-1]) > 1e-9:  # Avoid division by zero
+                relative_asset_weights = target_weights[:-1] / np.sum(target_weights[:-1])
+                dollar_value_per_asset = relative_asset_weights * assets_value_after_costs
+                shares[valid_prices_mask] = dollar_value_per_asset[valid_prices_mask] / prices_at_rebalance_start[valid_prices_mask]
+            
+            # Calculate portfolio value at end of period
+            next_prices_idx = self._current_prices_idx + self.rebalance_frequency_days
+            if next_prices_idx >= len(self.prices_df):  # End of data
+                self.portfolio_value = portfolio_value_after_costs
+                self.current_weights = target_weights
             else:
-                self.current_weights[:-1] = 0; self.current_weights[-1] = 1.0
+                prices_at_rebalance_end = self.prices_df.iloc[next_prices_idx][self.tickers].values
+                if np.isnan(prices_at_rebalance_end).any() or np.any(prices_at_rebalance_end <= 0):
+                    self.logger.warning(
+                        f"NaN or non-positive prices at end of holding period (idx {next_prices_idx}). "
+                        "Using start-of-period prices for asset valuation."
+                    )
+                    prices_at_rebalance_end = prices_at_rebalance_start
+                
+                value_of_assets_eod = np.sum(shares * prices_at_rebalance_end)
+                self.portfolio_value = value_of_assets_eod + cash_after_trade
+                
+                # Update weights based on new values
+                if self.portfolio_value > 1e-6:
+                    self.current_weights[:-1] = (shares * prices_at_rebalance_end) / self.portfolio_value
+                    self.current_weights[-1] = cash_after_trade / self.portfolio_value
+                    self.current_weights /= np.sum(self.current_weights)  # Normalize
+                else:
+                    self.current_weights[:-1] = 0.0
+                    self.current_weights[-1] = 1.0  # All (zero) cash
 
-        # Tính toán phần thưởng cuối cùng
-        self.episode_portfolio_log_returns.append(step_portfolio_log_return)
+        # Calculate step return and reward
+        step_portfolio_log_return = 0.0
+        if portfolio_value_before_trade > 1e-9:
+            current_ptf_val_for_log = max(self.portfolio_value, 1e-9)
+            step_portfolio_log_return = np.log(current_ptf_val_for_log / portfolio_value_before_trade)
         
+        self.episode_portfolio_log_returns.append(step_portfolio_log_return)
+
+        # Calculate reward
         if self.reward_use_log_return:
             reward = step_portfolio_log_return
-        else: # Simple return
-            reward = (self.portfolio_value / portfolio_value_before_trade_and_cost) - 1 if portfolio_value_before_trade_and_cost > 1e-6 else 0.0
-
-        # Áp dụng hình phạt turnover nếu có
-        if self.reward_turnover_penalty_factor > 0 and portfolio_value_before_trade_and_cost > 1e-6:
-            # trades_value đã được tính ở trên cho trường hợp có giao dịch
-            if np.isnan(prices_at_rebalance_start).any() or np.any(prices_at_rebalance_start <= 0): # Nếu không giao dịch
-                turnover_ratio = 0.0
-            else:
-                turnover_ratio = trades_value / portfolio_value_before_trade_and_cost
+        else:
+            reward = (self.portfolio_value / portfolio_value_before_trade - 1) if portfolio_value_before_trade > 1e-9 else 0.0
+        
+        # Apply turnover penalty if applicable
+        if (not (np.isnan(prices_at_rebalance_start).any() or np.any(prices_at_rebalance_start <= 0)) and
+                self.reward_turnover_penalty_factor > 0 and portfolio_value_before_trade > 1e-9):
+            turnover_ratio = trades_value / portfolio_value_before_trade
             reward -= self.reward_turnover_penalty_factor * turnover_ratio
         
-        self.episode_return_history.append(reward) # Lưu phần thưởng (có thể đã bao gồm penalty)
+        self.episode_return_history.append(reward)
 
+        # Update indices and step count
         self._current_prices_idx += self.rebalance_frequency_days
         self.current_step += 1
 
-        terminated = self.portfolio_value < 0.01 * self.initial_capital
-        if not terminated:
-            terminated = self.current_step >= self.max_steps # >= vì max_steps là số bước tối đa (0-indexed)
+        # Check termination conditions
+        terminated = (
+            self.portfolio_value < 0.01 * self.initial_capital or  # Substantial loss
+            self.current_step >= self.max_steps or  # Reached max steps
+            self._current_prices_idx >= len(self.prices_df)  # End of data
+        )
         
-        truncated = False
-        if self._current_prices_idx + self.rebalance_frequency_days > len(self.prices_df) : # > thay vì >= để cho phép bước cuối cùng
-             terminated = True
-
+        truncated = False  # For time limits not related to task completion
+        
+        # Prepare observation and info
+        observation = self._get_state() if not terminated else np.zeros_like(self.observation_space.sample())
+        
         info = {
             'portfolio_value': self.portfolio_value,
-            'weights': self.current_weights,
+            'weights': self.current_weights.tolist(),
             'transaction_costs': transaction_costs,
             'step_reward': reward,
-            'raw_log_return': step_portfolio_log_return # Luôn lưu log return thô để phân tích
+            'step_log_return': step_portfolio_log_return,
+            'raw_log_return': step_portfolio_log_return
         }
         
         if terminated:
-            info['cumulative_reward_shaped'] = np.sum(self.episode_return_history)
-            info['cumulative_log_return'] = np.sum(self.episode_portfolio_log_returns)
-            info['sharpe_ratio_from_log_returns'] = self.calculate_sharpe(self.episode_portfolio_log_returns)
-            logger.debug(f"Episode terminated. Final Ptf Value: {self.portfolio_value:.2f}, Cum Rew (shaped): {info['cumulative_reward_shaped']:.4f}, Cum LogRet: {info['cumulative_log_return']:.4f}")
-
-
-        logger.debug(
+            info.update({
+                'cumulative_reward_shaped': np.sum(self.episode_return_history),
+                'cumulative_log_return': np.sum(self.episode_portfolio_log_returns),
+                'sharpe_ratio': self.calculate_sharpe(self.episode_portfolio_log_returns)
+            })
+            self.logger.info(
+                f"Episode terminated. Final Ptf Value: {self.portfolio_value:.2f}, "
+                f"Cum Rew (shaped): {info['cumulative_reward_shaped']:.4f}, "
+                f"Cum LogRet: {info['cumulative_log_return']:.4f}"
+            )
+        
+        self.logger.debug(
             f"Step: {self.current_step}/{self.max_steps}, PtfVal: {self.portfolio_value:.2f}, "
-            f"ShapedRew: {reward:.5f}, LogRet: {step_portfolio_log_return:.5f}, TC: {transaction_costs:.2f}, "
-            f"Wts: {[f'{w:.2f}' for w in self.current_weights]}"
+            f"Rew: {reward:.5f}, LogRet: {step_portfolio_log_return:.5f}, "
+            f"TC: {transaction_costs:.2f}, Wts: {[f'{w:.2f}' for w in self.current_weights]}"
         )
-        return self._get_state(), reward, terminated, truncated, info
         
-    def calculate_sharpe(self, log_returns_history, risk_free_rate_daily=0.0): # Nhận log returns
-        if not log_returns_history or len(log_returns_history) < 2:
-            return 0.0
-        # Chuyển log return thành simple return để tính std chính xác hơn cho Sharpe truyền thống
-        # Hoặc có thể tính trực tiếp từ log return (ít phổ biến hơn cho Sharpe nhưng vẫn có thể)
-        # Đối với Sharpe, std của simple returns thường được sử dụng.
-        # simple_returns = np.exp(np.array(log_returns_history)) - 1
-        # mean_simple_return = np.mean(simple_returns)
-        # std_simple_return = np.std(simple_returns)
-
-        # Sử dụng trực tiếp log returns (xấp xỉ cho lợi nhuận nhỏ)
+        return observation, reward, terminated, truncated, info
+        
+    def calculate_sharpe(self, log_returns_history: list, risk_free_rate_annual: float = 0.0) -> float:
+        if not log_returns_history or len(log_returns_history) < 20: # Need a reasonable number of returns
+            return 0.0 # Or np.nan
+        
         log_returns_array = np.array(log_returns_history)
-        mean_log_return = np.mean(log_returns_array)
-        std_log_return = np.std(log_returns_array)
-
-        if std_log_return < 1e-9: # Gần như không có biến động
-            return 0.0 if abs(mean_log_return - risk_free_rate_daily) < 1e-9 else np.inf * np.sign(mean_log_return - risk_free_rate_daily)
         
-        sharpe = (mean_log_return - risk_free_rate_daily) / std_log_return * np.sqrt(252) # Giả sử daily log returns
-        return sharpe
+        # Assuming log_returns_history are per rebalance_frequency_days
+        # To annualize, we need to know how many such periods are in a year
+        periods_per_year = 252.0 / self.rebalance_frequency_days
+        
+        mean_period_log_return = np.mean(log_returns_array)
+        std_period_log_return = np.std(log_returns_array)
 
-    def render(self, mode='human'): # ... như cũ ...
+        # Annualize mean and std
+        # For log returns, mean_annual = mean_period * periods_per_year
+        # std_annual = std_period * sqrt(periods_per_year)
+        annualized_mean_log_return = mean_period_log_return * periods_per_year
+        annualized_std_log_return = std_period_log_return * np.sqrt(periods_per_year)
+        
+        # Daily risk-free rate (approx) if annual is given
+        # risk_free_rate_period = risk_free_rate_annual / periods_per_year # This is arithmetic
+        # For log returns, it's often simpler to use rf=0 or an already periodized rf rate.
+        # PyPortfolioOpt typically expects annualized rf rate.
+        # Let's assume risk_free_rate_annual is what we want to subtract from annualized_mean_log_return
+
+        if annualized_std_log_return < 1e-9:
+            # If no volatility, Sharpe is undefined or +/- inf
+            if abs(annualized_mean_log_return - risk_free_rate_annual) < 1e-9: return 0.0
+            return np.inf * np.sign(annualized_mean_log_return - risk_free_rate_annual)
+        
+        sharpe_ratio = (annualized_mean_log_return - risk_free_rate_annual) / annualized_std_log_return
+        return sharpe_ratio
+
+    def render(self, mode='human'):
         if mode == 'human':
-            print(f"Step: {self.current_step}")
-            print(f"Portfolio Value: {self.portfolio_value:.2f}")
-            print(f"Weights: {self.current_weights}")
-            print(f"Last shaped reward: {self.episode_return_history[-1] if self.episode_return_history else 'N/A'}")
-            print(f"Last portfolio log return: {self.episode_portfolio_log_returns[-1] if self.episode_portfolio_log_returns else 'N/A'}")
-
+            self.logger.info(f"Render - Step: {self.current_step}, Ptf Value: {self.portfolio_value:.2f}, "
+                        f"Weights: {[f'{w:.3f}' for w in self.current_weights]}")
 
     def close(self):
+        self.logger.debug("PortfolioEnv closed.")
         pass
