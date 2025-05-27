@@ -96,6 +96,7 @@ def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame, logger_instance
             weights = ef.max_sharpe(risk_free_rate=configs.MARKOWITZ_RISK_FREE_RATE)
         
         cleaned_weights = ef.clean_weights()
+        expected_annual_return, annual_volatility, sharpe_ratio = ef.portfolio_performance(risk_free_rate=configs.MARKOWITZ_RISK_FREE_RATE)
         current_logger.info(f"Markowitz optimization successful. Portfolio performance (expected): AnnReturn={ef.portfolio_performance()[0]:.2%}, AnnVol={ef.portfolio_performance()[1]:.2%}, Sharpe={ef.portfolio_performance()[2]:.2f}")
         current_logger.debug(f"Optimized Markowitz weights: {cleaned_weights}")
         return cleaned_weights

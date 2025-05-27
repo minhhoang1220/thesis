@@ -72,12 +72,17 @@ def update_portfolio_values_daily(rebalance_history_df: pd.DataFrame, all_prices
 
     all_trading_days_in_period = all_prices_for_daily_calc.index
     
-    daily_portfolio_df = pd.DataFrame(
-        index=all_trading_days_in_period,
-        columns=['value', 'cash', 'returns', 'weights']
-    )
+    daily_portfolio_df = pd.DataFrame(index=all_trading_days_in_period)
+    daily_portfolio_df['value'] = np.nan
+    daily_portfolio_df['cash'] = np.nan
+    daily_portfolio_df['returns'] = np.nan
+    daily_portfolio_df['weights'] = None
+
     daily_portfolio_df = daily_portfolio_df.astype({
-        'value': float, 'cash': float, 'returns': float, 'weights': object
+        'value': float,
+        'cash': float,
+        'returns': float,
+        'weights': object # Quan trọng để gán dict
     })
 
     last_known_portfolio_value = configs.INITIAL_CAPITAL
@@ -120,7 +125,7 @@ def update_portfolio_values_daily(rebalance_history_df: pd.DataFrame, all_prices
             daily_portfolio_df.loc[current_date, 'returns'] = float(rebal_entry['returns']) # This is rebal-to-rebal return
             
             current_weights_at_rebal = rebal_entry['weights'] if isinstance(rebal_entry['weights'], dict) else {}
-            daily_portfolio_df.loc[current_date, 'weights'] = current_weights_at_rebal
+            daily_portfolio_df.at[current_date, 'weights'] = current_weights_at_rebal
             
             last_known_portfolio_value = float(rebal_entry['value'])
             last_known_cash = float(rebal_entry['cash'])
@@ -169,7 +174,7 @@ def update_portfolio_values_daily(rebalance_history_df: pd.DataFrame, all_prices
                     price_for_day = current_prices_for_day.get(ticker)
                     if pd.notna(price_for_day) and price_for_day > 0:
                         current_day_actual_weights[ticker] = (shares * price_for_day) / new_portfolio_value_eod
-            daily_portfolio_df.loc[current_date, 'weights'] = current_day_actual_weights
+            daily_portfolio_df.at[current_date, 'weights'] = current_day_actual_weights
             
             last_known_portfolio_value = new_portfolio_value_eod # Update for the next day
 
@@ -337,18 +342,70 @@ def main():
         markowitz_backtester.rebalance(rebal_date, target_weights_mw, prices_on_rebal_mw)
 
     if markowitz_backtester.portfolio_history:
+        # Convert portfolio history to DataFrame
         markowitz_rebal_history_df = pd.DataFrame(markowitz_backtester.portfolio_history).set_index('date')
-        daily_markowitz_perf_df = update_portfolio_values_daily(markowitz_rebal_history_df, all_prices_pivot_for_backtest)
-        if daily_markowitz_perf_df is not None and not daily_markowitz_perf_df.empty:
-            metrics_calculator = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL) # Fresh instance for metrics
-            all_portfolio_metrics['Markowitz'] = metrics_calculator.calculate_metrics(portfolio_returns_series=daily_markowitz_perf_df['returns'].fillna(0))
-            all_daily_performance_dfs['Markowitz'] = daily_markowitz_perf_df
-            try:
-                daily_markowitz_perf_df.to_csv(configs.RESULTS_OUTPUT_DIR / "markowitz_performance_daily.csv")
-                logger.info("Markowitz daily performance saved.")
-            except Exception as e_save: logger.error(f"Error saving Markowitz performance: {e_save}", exc_info=True)
-        else: logger.error("Markowitz daily performance DataFrame is empty or None.")
-    else: logger.warning("Markowitz strategy resulted in no rebalance history.")
+        
+        # Generate daily performance DataFrame
+        daily_markowitz_perf_df = update_portfolio_values_daily(
+            markowitz_rebal_history_df, 
+            all_prices_pivot_for_backtest
+        )
+        
+        # Validate the performance DataFrame
+        if daily_markowitz_perf_df is not None and not daily_markowitz_perf_df.empty and 'returns' in daily_markowitz_perf_df.columns:
+            logger.info(
+                f"Markowitz daily performance DataFrame generated. Shape: {daily_markowitz_perf_df.shape}. "
+                f"Columns: {daily_markowitz_perf_df.columns.tolist()}"
+            )
+            
+            # Process returns series
+            portfolio_returns_for_metrics = daily_markowitz_perf_df['returns'].fillna(0.0).astype(float)
+            
+            if not portfolio_returns_for_metrics.empty:
+                try:
+                    # Calculate metrics with enhanced calculator
+                    metrics_calculator = backtesting.PortfolioBacktester(configs.INITIAL_CAPITAL)
+                    markowitz_metrics = metrics_calculator.calculate_metrics(
+                        portfolio_returns_series=portfolio_returns_for_metrics,
+                        logger_instance=logger  # Pass logger for consistent logging
+                    )
+                    
+                    if not markowitz_metrics.empty:
+                        all_portfolio_metrics['Markowitz'] = markowitz_metrics
+                        all_daily_performance_dfs['Markowitz'] = daily_markowitz_perf_df
+                        
+                        # Save performance data
+                        try:
+                            output_path = configs.RESULTS_OUTPUT_DIR / getattr(
+                                configs, 
+                                'MARKOWITZ_PERF_DAILY_FILE_NAME', 
+                                "markowitz_performance_daily.csv"
+                            )
+                            daily_markowitz_perf_df.to_csv(output_path)
+                            logger.info(f"Successfully saved Markowitz daily performance to {output_path}")
+                        except Exception as e_save:
+                            logger.error(f"Failed to save Markowitz performance: {e_save}", exc_info=True)
+                    else:
+                        logger.warning("Markowitz metrics calculation returned empty Series")
+                except Exception as e_metrics:
+                    logger.error(f"Error calculating Markowitz metrics: {e_metrics}", exc_info=True)
+            else:
+                logger.error("Processed Markowitz returns series is empty")
+        else:
+            error_details = []
+            if daily_markowitz_perf_df is None:
+                error_details.append("is None")
+            elif daily_markowitz_perf_df.empty:
+                error_details.append("is empty")
+            if 'returns' not in daily_markowitz_perf_df.columns:
+                error_details.append("missing 'returns' column")
+                
+            logger.error(
+                f"Invalid Markowitz performance DataFrame: {'; '.join(error_details)}. "
+                f"Available columns: {daily_markowitz_perf_df.columns.tolist() if daily_markowitz_perf_df is not None else 'None'}"
+            )
+    else:
+        logger.warning("Markowitz strategy resulted in no rebalance history - no metrics calculated")
 
     # === Strategy 2: Black-Litterman ===
     logger.info("\n--- Running Black-Litterman Strategy ---")
@@ -513,56 +570,76 @@ def main():
             trained_rl_model = None
 
 
-        if condition_to_retrain_rl:
+        if condition_to_retrain_rl: 
             logger.info("Training a new RL model as no valid pre-trained model/scaler was found or forced retrain.")
-            # Prepare training data for RL (uses different date range from configs)
-            prices_for_rl_training = data_preparation.load_price_data_for_portfolio(
-                custom_start_date_str=configs.RL_TRAIN_DATA_START_DATE,
-                custom_end_date_str=configs.RL_TRAIN_DATA_END_DATE,
-                include_buffer_for_rolling=True # Buffer for lookback window in RL env
-            )
-            if prices_for_rl_training.empty or len(prices_for_rl_training) < configs.RL_LOOKBACK_WINDOW_SIZE + 10: # Check length
-                logger.error("Not enough price data for RL training. Skipping RL strategy.")
-            else:
-                # Filter RL training prices to only include tickers valid for the backtest period
-                prices_for_rl_training_filtered = prices_for_rl_training[valid_tickers_for_backtest].copy()
-                prices_for_rl_training_filtered.dropna(axis=1, how='all', inplace=True)
-
-                if prices_for_rl_training_filtered.empty:
-                     logger.error("Price data for RL training became empty after filtering for backtest tickers. Skipping RL strategy.")
+            
+            # Prepare training data for RL
+            try:
+                prices_for_rl_training = data_preparation.load_price_data_for_portfolio(
+                    custom_start_date_str=configs.RL_TRAIN_DATA_START_DATE,
+                    custom_end_date_str=configs.RL_TRAIN_DATA_END_DATE,
+                    include_buffer_for_rolling=True
+                )
+                
+                # Data validation checks
+                if prices_for_rl_training.empty:
+                    logger.error("Empty price data loaded for RL training. Skipping RL strategy.")
+                elif len(prices_for_rl_training) < configs.RL_LOOKBACK_WINDOW_SIZE + 10:
+                    logger.error(f"Insufficient RL training data ({len(prices_for_rl_training)} rows). Need at least {configs.RL_LOOKBACK_WINDOW_SIZE + 10} rows.")
                 else:
-                    logger.info(f"RL Training Data: Prices shape {prices_for_rl_training_filtered.shape}")
-                    # Financial and classification data for RL training period needs to be sliced appropriately
-                    # This needs robust slicing based on dates in prices_for_rl_training_filtered
-                    # For simplicity, passing the master filtered ones, the RL env should handle date alignment.
-                    trained_rl_model, fitted_scaler_from_train = rl_optimizer.train_rl_agent(
-                        prices_df_train=prices_for_rl_training_filtered,
-                        financial_data_train=financial_data_filtered,  # Pass filtered master, env/scaler will handle date slicing
-                        classification_probs_train=classification_probs_filtered,  # Same as above
-                        financial_features_list=configs.RL_FINANCIAL_FEATURES,
-                        prob_features_list=configs.RL_PROB_FEATURES,
-                        model_save_path=configs.RL_MODEL_SAVE_PATH,
-                        log_dir=configs.RL_MODEL_DIR,  # For SB3 logs, not general app logs
-                        initial_capital=configs.INITIAL_CAPITAL,  # Use same initial capital for consistency in reward scaling
-                        transaction_cost_bps=configs.RL_TRANSACTION_COST_BPS,
-                        lookback_window_size=configs.RL_LOOKBACK_WINDOW_SIZE,
-                        rebalance_frequency_days=configs.RL_REBALANCE_FREQUENCY_DAYS,
-                        total_timesteps=configs.RL_TOTAL_TIMESTEPS,
-                        rl_algorithm=configs.RL_ALGORITHM,
-                        ppo_n_steps=configs.RL_PPO_N_STEPS,
-                        ppo_batch_size=configs.RL_PPO_BATCH_SIZE,
-                        ppo_n_epochs=configs.RL_PPO_N_EPOCHS,
-                        ppo_gamma=configs.RL_PPO_GAMMA,
-                        ppo_gae_lambda=configs.RL_PPO_GAE_LAMBDA,
-                        ppo_clip_range=configs.RL_PPO_CLIP_RANGE,
-                        ppo_ent_coef=configs.RL_PPO_ENT_COEF,
-                        ppo_vf_coef=configs.RL_PPO_VF_COEF,
-                        ppo_max_grad_norm=configs.RL_PPO_MAX_GRAD_NORM,
-                        ppo_learning_rate=configs.RL_PPO_LEARNING_RATE,
-                        ppo_policy_kwargs=configs.RL_PPO_POLICY_KWARGS,
-                        reward_use_log_return=configs.RL_REWARD_USE_LOG_RETURN,
-                        reward_turnover_penalty_factor=configs.RL_REWARD_TURNOVER_PENALTY_FACTOR
-                    )
+                    # Filter and validate tickers
+                    prices_for_rl_training_filtered = prices_for_rl_training[valid_tickers_for_backtest].copy()
+                    prices_for_rl_training_filtered.dropna(axis=1, how='all', inplace=True)
+                    
+                    if prices_for_rl_training_filtered.empty:
+                        logger.error("No valid tickers remaining after filtering RL training data.")
+                    else:
+                        logger.info(
+                            f"RL Training Data: Prices shape {prices_for_rl_training_filtered.shape}, "
+                            f"Tickers: {len(prices_for_rl_training_filtered.columns)}"
+                        )
+                        
+                        # Prepare output paths
+                        rl_model_main_save_path = configs.RL_MODEL_SAVE_PATH
+                        rl_eval_cb_path = configs.RL_MODEL_DIR / "sb3_eval_logs"
+                        rl_tb_log_path = configs.RL_MODEL_DIR / "sb3_tb_logs"
+                        
+                        # Create directories if they don't exist
+                        for path in [rl_eval_cb_path, rl_tb_log_path]:
+                            path.mkdir(parents=True, exist_ok=True)
+                        
+                        # Train RL agent with comprehensive logging
+                        logger.info("Starting RL model training...")
+                        trained_rl_model, fitted_scaler_from_train = rl_optimizer.train_rl_agent(
+                            prices_df_train=prices_for_rl_training_filtered,
+                            financial_data_train=financial_data_filtered,
+                            classification_probs_train=classification_probs_filtered,
+                            financial_features_list=configs.RL_FINANCIAL_FEATURES,
+                            prob_features_list=configs.RL_PROB_FEATURES,
+                            model_save_path=rl_model_main_save_path,
+                            eval_callback_log_path=rl_eval_cb_path,
+                            tensorboard_log_path=rl_tb_log_path,
+                            logger_instance=logger,
+                            initial_capital=configs.INITIAL_CAPITAL,
+                            transaction_cost_bps=configs.RL_TRANSACTION_COST_BPS,
+                            lookback_window_size=configs.RL_LOOKBACK_WINDOW_SIZE,
+                            rebalance_frequency_days=configs.RL_REBALANCE_FREQUENCY_DAYS,
+                            total_timesteps=configs.RL_TOTAL_TIMESTEPS,
+                            rl_algorithm=configs.RL_ALGORITHM,
+                            ppo_n_steps=configs.RL_PPO_N_STEPS,
+                            ppo_batch_size=configs.RL_PPO_BATCH_SIZE,
+                            ppo_n_epochs=configs.RL_PPO_N_EPOCHS,
+                            ppo_gamma=configs.RL_PPO_GAMMA,
+                            ppo_gae_lambda=configs.RL_PPO_GAE_LAMBDA,
+                            ppo_clip_range=configs.RL_PPO_CLIP_RANGE,
+                            ppo_ent_coef=configs.RL_PPO_ENT_COEF,
+                            ppo_vf_coef=configs.RL_PPO_VF_COEF,
+                            ppo_max_grad_norm=configs.RL_PPO_MAX_GRAD_NORM,
+                            ppo_learning_rate=configs.RL_PPO_LEARNING_RATE,
+                            ppo_policy_kwargs=configs.RL_PPO_POLICY_KWARGS,
+                            reward_use_log_return=configs.RL_REWARD_USE_LOG_RETURN,
+                            reward_turnover_penalty_factor=configs.RL_REWARD_TURNOVER_PENALTY_FACTOR
+                        )
                     if trained_rl_model and fitted_scaler_from_train and fitted_scaler_from_train.feature_names:
                         rl_fin_scaler = fitted_scaler_from_train # Update scaler to the one from this training run
                         logger.info("RL model training complete. Using newly trained model and scaler.")
@@ -570,6 +647,8 @@ def main():
                         logger.warning("RL model trained, but scaler returned was invalid. Financial features might not be scaled correctly in inference.")
                     else:
                         logger.error("RL model training failed.")
+            except Exception as e:
+                logger.error(f"Error during RL model training preparation: {str(e)}", exc_info=True)
             
         # --- 2. Backtest RL Strategy ---
         if trained_rl_model is None:

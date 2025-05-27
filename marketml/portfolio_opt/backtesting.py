@@ -210,59 +210,90 @@ class PortfolioBacktester:
         df = df.set_index('date').sort_index() # Ensure sorted by date
         return df
 
-    def calculate_metrics(self, portfolio_returns_series: pd.Series, benchmark_returns: pd.Series = None) -> pd.Series:
+    def calculate_metrics(self, portfolio_returns_series: pd.Series, benchmark_returns: pd.Series = None, logger_instance: logging.Logger = None) -> pd.Series:
         """
-        Calculates performance metrics using QuantStats.
+        Calculates performance metrics using QuantStats with enhanced error handling and logging.
 
         Args:
             portfolio_returns_series (pd.Series): Daily returns of the portfolio.
             benchmark_returns (pd.Series, optional): Daily returns of the benchmark.
+            logger_instance (logging.Logger, optional): Custom logger instance.
 
         Returns:
             pd.Series: Series containing calculated performance metrics.
         """
-        if portfolio_returns_series is None or portfolio_returns_series.empty or portfolio_returns_series.isnull().all():
-            logger.error("Portfolio returns series is empty or all NaN. Cannot calculate metrics.")
-            return pd.Series(dtype=float) # Return empty Series
-
-        logger.info("Calculating performance metrics using QuantStats...")
+        current_logger = logger_instance if logger_instance else logger
+        
+        # Input validation
+        if portfolio_returns_series is None:
+            current_logger.error("Portfolio returns series is None. Cannot calculate metrics.")
+            return pd.Series(dtype=float)
+        
+        if not isinstance(portfolio_returns_series, pd.Series):
+            current_logger.error(f"portfolio_returns_series is not a Pandas Series, but type {type(portfolio_returns_series)}. Cannot calculate metrics.")
+            return pd.Series(dtype=float)
+        
+        if portfolio_returns_series.empty:
+            current_logger.error("Portfolio returns series is empty. Cannot calculate metrics.")
+            return pd.Series(dtype=float)
+        
+        # Data preprocessing
+        try:
+            processed_returns = portfolio_returns_series.astype(float).fillna(0.0)
+        except Exception as e:
+            current_logger.error(f"Error converting returns to float: {e}", exc_info=True)
+            return pd.Series(dtype=float)
+        
+        if processed_returns.isnull().any():
+            current_logger.warning("Portfolio returns still contain NaN values after conversion, filling with zeros")
+            processed_returns = processed_returns.fillna(0.0)
+        
+        current_logger.info("Calculating performance metrics using QuantStats...")
         qs.extend_pandas()
         
-        # Ensure returns are float
-        portfolio_returns_series = portfolio_returns_series.astype(float).fillna(0.0)
-
-        metrics_dict = {
-            'Cumulative Return': qs.stats.comp(portfolio_returns_series) * 100,
-            'Annualized Return': qs.stats.cagr(portfolio_returns_series, compounded=True) * 100,
-            'Annualized Volatility': qs.stats.volatility(portfolio_returns_series, annualize=True, compounded=True) * 100, # compounded=True for daily simple returns
-            'Sharpe Ratio': qs.stats.sharpe(portfolio_returns_series, rf=configs.MARKOWITZ_RISK_FREE_RATE, annualize=True, compounded=True),
-            'Sortino Ratio': qs.stats.sortino(portfolio_returns_series, rf=configs.MARKOWITZ_RISK_FREE_RATE, annualize=True, compounded=True),
-            'Max Drawdown': qs.stats.max_drawdown(portfolio_returns_series) * 100,
-            'Skew': qs.stats.skew(portfolio_returns_series),
-            'Kurtosis': qs.stats.kurtosis(portfolio_returns_series),
-            'Calmar Ratio': qs.stats.calmar(portfolio_returns_series),
-            'Value at Risk (VaR)': qs.stats.var(portfolio_returns_series) * 100, # Daily VaR
-            'Conditional VaR (CVaR)': qs.stats.cvar(portfolio_returns_series) * 100, # Daily CVaR
-        }
-
-        if benchmark_returns is not None and not benchmark_returns.empty:
-            benchmark_returns = benchmark_returns.astype(float).fillna(0.0)
-            logger.info("Calculating benchmark metrics...")
+        # Calculate base metrics
+        try:
+            metrics_dict = {
+                'Cumulative Return': qs.stats.comp(processed_returns) * 100,
+                'Annualized Return': qs.stats.cagr(processed_returns, compounded=True) * 100,
+                'Annualized Volatility': qs.stats.volatility(processed_returns, annualize=True) * 100,
+                'Sharpe Ratio': qs.stats.sharpe(processed_returns, rf=configs.MARKOWITZ_RISK_FREE_RATE, annualize=True),
+                'Sortino Ratio': qs.stats.sortino(processed_returns, rf=configs.MARKOWITZ_RISK_FREE_RATE, annualize=True),
+                'Max Drawdown': qs.stats.max_drawdown(processed_returns) * 100,
+                'Skew': qs.stats.skew(processed_returns),
+                'Kurtosis': qs.stats.kurtosis(processed_returns),
+                'Calmar Ratio': qs.stats.calmar(processed_returns),
+                'Value at Risk (VaR)': qs.stats.var(processed_returns) * 100,
+                'Conditional VaR (CVaR)': qs.stats.cvar(processed_returns) * 100,
+            }
+        except Exception as e_metrics:
+            current_logger.error(f"Error calculating base metrics: {e_metrics}", exc_info=True)
+            return pd.Series(dtype=float)
+        
+        # Calculate benchmark-related metrics if benchmark provided
+        if benchmark_returns is not None:
             try:
-                common_index = portfolio_returns_series.index.intersection(benchmark_returns.index)
-                if not common_index.empty:
-                    portfolio_aligned = portfolio_returns_series.loc[common_index]
-                    benchmark_aligned = benchmark_returns.loc[common_index]
-
-                    metrics_dict['Benchmark Cumulative Return'] = qs.stats.comp(benchmark_aligned) * 100
-                    metrics_dict['Benchmark Annualized Return'] = qs.stats.cagr(benchmark_aligned, compounded=True) * 100
-                    metrics_dict['Benchmark Annualized Volatility'] = qs.stats.volatility(benchmark_aligned, annualize=True, compounded=True) * 100
-                    metrics_dict['Beta'] = qs.stats.beta(portfolio_aligned, benchmark_aligned)
-                    metrics_dict['Alpha (Annualized)'] = qs.stats.alpha(portfolio_aligned, benchmark_aligned, rf=configs.MARKOWITZ_RISK_FREE_RATE, annualize=True) * 100
-                    metrics_dict['Information Ratio'] = qs.stats.information_ratio(portfolio_aligned, benchmark_aligned)
-                else:
-                    logger.warning("No common index found between portfolio and benchmark returns. Skipping benchmark-related metrics.")
+                if not isinstance(benchmark_returns, pd.Series):
+                    current_logger.warning("Benchmark returns is not a Pandas Series. Skipping benchmark metrics.")
+                elif not benchmark_returns.empty:
+                    benchmark_processed = benchmark_returns.astype(float).fillna(0.0)
+                    
+                    common_index = processed_returns.index.intersection(benchmark_processed.index)
+                    if not common_index.empty:
+                        portfolio_aligned = processed_returns.loc[common_index]
+                        benchmark_aligned = benchmark_processed.loc[common_index]
+                        
+                        metrics_dict.update({
+                            'Benchmark Cumulative Return': qs.stats.comp(benchmark_aligned) * 100,
+                            'Benchmark Annualized Return': qs.stats.cagr(benchmark_aligned, compounded=True) * 100,
+                            'Benchmark Annualized Volatility': qs.stats.volatility(benchmark_aligned, annualize=True, compounded=True) * 100,
+                            'Beta': qs.stats.beta(portfolio_aligned, benchmark_aligned),
+                            'Alpha (Annualized)': qs.stats.alpha(portfolio_aligned, benchmark_aligned, rf=configs.MARKOWITZ_RISK_FREE_RATE, annualize=True) * 100,
+                            'Information Ratio': qs.stats.information_ratio(portfolio_aligned, benchmark_aligned),
+                        })
+                    else:
+                        current_logger.warning("No common index between portfolio and benchmark. Skipping benchmark metrics.")
             except Exception as e_bench:
-                logger.error(f"Error calculating benchmark-related metrics: {e_bench}", exc_info=True)
-
+                current_logger.error(f"Error calculating benchmark metrics: {e_bench}", exc_info=True)
+        
         return pd.Series(metrics_dict)
