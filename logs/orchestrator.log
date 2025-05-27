@@ -5700,3 +5700,430 @@ RL_Strategy              369.6752           195.2965                73.0853     
 2025-05-27 19:01:07,968 - marketml_project - INFO - Finished: 05_run_portfolio_backtests pipeline
 2025-05-27 19:01:08,271 - marketml_project - INFO - Successfully completed stage: run_backtests
 2025-05-27 19:01:08,273 - marketml_project - INFO - Pipeline finished.
+2025-05-27 23:46:07,333 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 23:46:07,335 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-27 23:46:07,335 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 23:46:07,509 - marketml_project - INFO - ===== Starting Analysis Script =====
+2025-05-27 23:46:07,509 - marketml_project - INFO - --- Analyzing Portfolio Performance ---
+2025-05-27 23:46:07,522 - marketml_project - INFO - Loaded daily performance for Markowitz from /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-27 23:46:07,527 - marketml_project - INFO - Loaded daily performance for BlackLitterman from /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-27 23:46:07,531 - marketml_project - INFO - Loaded daily performance for RL_Strategy from /home/hoang/Documents/KhoaLuan/.ndmh/results_output/ppo_strategy_performance_daily.csv
+2025-05-27 23:46:07,533 - marketml_project - INFO - Loaded portfolio strategies summary from /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_strategies_summary.csv
+2025-05-27 23:46:09,188 - marketml_project - ERROR - Error running stage analyze_performance: rolling_sharpe() got an unexpected keyword argument 'rolling_window'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 30, in run_stage
+    analyze_model_performance.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 149, in main
+    analyze_portfolio_performance()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 137, in analyze_portfolio_performance
+    plotly_plotter.plot_rolling_sharpe_ratio(
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/plot_utils.py", line 321, in plot_rolling_sharpe_ratio
+    rolling_sharpe = qs.stats.rolling_sharpe(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: rolling_sharpe() got an unexpected keyword argument 'rolling_window'
+2025-05-27 23:46:09,189 - marketml_project - INFO - Pipeline finished.
+2025-05-27 23:55:00,323 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-27 23:55:00,324 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-27 23:55:00,325 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-27 23:55:00,461 - marketml_project - INFO - ===== Starting Analysis Script =====
+2025-05-27 23:55:00,461 - marketml_project - INFO - --- Analyzing Portfolio Performance ---
+2025-05-27 23:55:00,469 - marketml_project - INFO - Loaded daily performance for Markowitz from /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-27 23:55:00,473 - marketml_project - INFO - Loaded daily performance for BlackLitterman from /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-27 23:55:00,478 - marketml_project - INFO - Loaded daily performance for RL_Strategy from /home/hoang/Documents/KhoaLuan/.ndmh/results_output/ppo_strategy_performance_daily.csv
+2025-05-27 23:55:00,481 - marketml_project - INFO - Loaded portfolio strategies summary from /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_strategies_summary.csv
+2025-05-27 23:55:04,066 - marketml_project - ERROR - Error running stage analyze_performance: plot_rolling_sharpe_ratio() got an unexpected keyword argument 'save_filename_suffix'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 30, in run_stage
+    analyze_model_performance.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 149, in main
+    analyze_portfolio_performance()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 137, in analyze_portfolio_performance
+    plotly_plotter.plot_rolling_sharpe_ratio(
+TypeError: plot_rolling_sharpe_ratio() got an unexpected keyword argument 'save_filename_suffix'
+2025-05-27 23:55:04,067 - marketml_project - INFO - Pipeline finished.
+2025-05-28 00:01:18,824 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 00:01:18,825 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 00:01:18,825 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 00:01:18,939 - marketml_project - INFO - ===== Starting Analysis Script =====
+2025-05-28 00:01:18,939 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-28 00:01:18,939 - marketml_project - ERROR - Error running stage analyze_performance: module 'marketml.analysis.plot_utils' has no attribute 'load_summary_results'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 30, in run_stage
+    analyze_model_performance.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 147, in main
+    analyze_forecasting_model_performance()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 40, in analyze_forecasting_model_performance
+    df_summary = plotly_plotter.load_summary_results(file_path=SUMMARY_FILE_PATH)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'marketml.analysis.plot_utils' has no attribute 'load_summary_results'
+2025-05-28 00:01:18,940 - marketml_project - INFO - Pipeline finished.
+2025-05-28 00:01:29,873 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 00:01:29,874 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 00:01:29,874 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 00:01:29,974 - marketml_project - INFO - ===== Starting Analysis Script =====
+2025-05-28 00:01:29,974 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-28 00:01:29,974 - marketml_project - ERROR - Error running stage analyze_performance: module 'marketml.analysis.plot_utils' has no attribute 'load_summary_results'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 30, in run_stage
+    analyze_model_performance.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 147, in main
+    analyze_forecasting_model_performance()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 40, in analyze_forecasting_model_performance
+    df_summary = plotly_plotter.load_summary_results(file_path=SUMMARY_FILE_PATH)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'marketml.analysis.plot_utils' has no attribute 'load_summary_results'
+2025-05-28 00:01:29,976 - marketml_project - INFO - Pipeline finished.
+2025-05-28 00:14:48,657 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 00:14:48,659 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 00:14:48,659 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 00:14:48,926 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-28 00:14:48,926 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-28 00:14:48,926 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-28 00:14:48,951 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-28 00:14:48,967 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/rl_strategy_performance_daily.csv
+2025-05-28 00:14:48,969 - marketml_project - ERROR - File not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/rl_strategy_performance_daily.csv'
+2025-05-28 00:14:48,970 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_summary.csv
+2025-05-28 00:14:48,971 - marketml_project - ERROR - File not found at '/home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_summary.csv'
+2025-05-28 00:14:52,372 - marketml_project - ERROR - Error running stage analyze_performance: rolling_sharpe() got an unexpected keyword argument 'window1'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 30, in run_stage
+    analyze_model_performance.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 173, in main
+    analyze_portfolio_strategies()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 158, in analyze_portfolio_strategies
+    plot_rolling_sharpe_ratio(
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/plot_utils.py", line 343, in plot_rolling_sharpe_ratio
+    rolling_sharpe = qs.stats.rolling_sharpe(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: rolling_sharpe() got an unexpected keyword argument 'window1'
+2025-05-28 00:14:52,374 - marketml_project - INFO - Pipeline finished.
+2025-05-28 00:33:52,090 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 00:33:52,091 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 00:33:52,091 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 00:33:52,238 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-28 00:33:52,238 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-28 00:33:52,238 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-28 00:33:52,247 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-28 00:33:52,247 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-28 00:33:52,248 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-28 00:33:52,254 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-28 00:33:52,259 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/ppo_strategy_performance_daily.csv
+2025-05-28 00:33:52,264 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_strategies_summary.csv
+2025-05-28 00:33:55,604 - marketml_project - ERROR - Error running stage analyze_performance: rolling_sharpe() got an unexpected keyword argument 'rolling_window'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 30, in run_stage
+    analyze_model_performance.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 194, in main
+    analyze_portfolio_strategies()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 182, in analyze_portfolio_strategies
+    plot_rolling_sharpe_ratio(
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/plot_utils.py", line 343, in plot_rolling_sharpe_ratio
+    rolling_sharpe = qs.stats.rolling_sharpe(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: rolling_sharpe() got an unexpected keyword argument 'rolling_window'
+2025-05-28 00:33:55,607 - marketml_project - INFO - Pipeline finished.
+2025-05-28 00:37:13,040 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 00:37:13,041 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 00:37:13,042 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 00:37:13,143 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-28 00:37:13,143 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-28 00:37:13,143 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-28 00:37:13,149 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-28 00:37:13,150 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-28 00:37:13,150 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-28 00:37:13,155 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-28 00:37:13,161 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/ppo_strategy_performance_daily.csv
+2025-05-28 00:37:13,166 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_strategies_summary.csv
+2025-05-28 00:37:15,782 - marketml_project - ERROR - Error running stage analyze_performance: rolling_sharpe() got an unexpected keyword argument 'rolling_window'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 30, in run_stage
+    analyze_model_performance.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 194, in main
+    analyze_portfolio_strategies()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 182, in analyze_portfolio_strategies
+    plot_rolling_sharpe_ratio(
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/plot_utils.py", line 343, in plot_rolling_sharpe_ratio
+    rolling_sharpe = qs.stats.rolling_sharpe(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: rolling_sharpe() got an unexpected keyword argument 'rolling_window'
+2025-05-28 00:37:15,783 - marketml_project - INFO - Pipeline finished.
+2025-05-28 00:40:42,806 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 00:40:42,808 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 00:40:42,808 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 00:40:43,275 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-28 00:40:43,275 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-28 00:40:43,275 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-28 00:40:43,283 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-28 00:40:43,283 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-28 00:40:43,283 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-28 00:40:43,287 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-28 00:40:43,290 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/ppo_strategy_performance_daily.csv
+2025-05-28 00:40:43,294 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_strategies_summary.csv
+2025-05-28 00:40:49,492 - marketml_project - ERROR - Error running stage analyze_performance: rolling_sharpe() got an unexpected keyword argument 'rolling_window'
+Traceback (most recent call last):
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 61, in <module>
+    run_stage(stage)
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/run_pipeline.py", line 30, in run_stage
+    analyze_model_performance.main()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 194, in main
+    analyze_portfolio_strategies()
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/analyze_model_performance.py", line 182, in analyze_portfolio_strategies
+    plot_rolling_sharpe_ratio(
+  File "/home/hoang/Documents/KhoaLuan/.ndmh/marketml/analysis/plot_utils.py", line 343, in plot_rolling_sharpe_ratio
+    rolling_sharpe = qs.stats.rolling_sharpe(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: rolling_sharpe() got an unexpected keyword argument 'rolling_window'
+2025-05-28 00:40:49,494 - marketml_project - INFO - Pipeline finished.
+2025-05-28 00:46:35,930 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 00:46:35,932 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 00:46:35,932 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 00:46:36,023 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-28 00:46:36,024 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-28 00:46:36,024 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-28 00:46:36,030 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-28 00:46:36,030 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-28 00:46:36,030 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-28 00:46:36,035 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-28 00:46:36,040 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/ppo_strategy_performance_daily.csv
+2025-05-28 00:46:36,044 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_strategies_summary.csv
+2025-05-28 00:46:39,554 - marketml_project - INFO - ===== Analysis Completed =====
+2025-05-28 00:46:39,554 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-28 00:46:39,554 - marketml_project - INFO - Pipeline finished.
+2025-05-28 00:47:12,775 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 00:47:12,776 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 00:47:12,776 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 00:47:12,930 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-28 00:47:12,930 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-28 00:47:12,930 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-28 00:47:12,938 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-28 00:47:12,938 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-28 00:47:12,939 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-28 00:47:12,947 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-28 00:47:12,952 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/ppo_strategy_performance_daily.csv
+2025-05-28 00:47:12,956 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_strategies_summary.csv
+2025-05-28 00:47:15,809 - marketml_project - INFO - ===== Analysis Completed =====
+2025-05-28 00:47:15,809 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-28 00:47:15,809 - marketml_project - INFO - Pipeline finished.
+2025-05-28 01:10:49,177 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-28 01:10:49,179 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-28 01:10:49,179 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-28 01:10:49,354 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-28 01:10:49,355 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-28 01:10:49,355 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_summary.csv
+2025-05-28 01:10:49,386 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-28 01:10:53,260 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/model_performance_detailed.csv
+2025-05-28 01:10:53,475 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-28 01:10:53,475 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/markowitz_performance_daily.csv
+2025-05-28 01:10:53,484 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/blacklitterman_performance_daily.csv
+2025-05-28 01:10:53,489 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/ppo_strategy_performance_daily.csv
+2025-05-28 01:10:53,495 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/results_output/portfolio_strategies_summary.csv
+2025-05-28 01:10:55,847 - marketml_project - ERROR - Error generating plotly portfolio plots: plot_rolling_sharpe_ratio() got an unexpected keyword argument 'save_filename_base'
+2025-05-28 01:10:55,847 - marketml_project - INFO - ===== Analysis Completed =====
+2025-05-28 01:10:55,847 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-28 01:10:55,847 - marketml_project - INFO - Pipeline finished.

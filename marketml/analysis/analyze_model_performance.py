@@ -1,209 +1,288 @@
 # /.ndmh/marketml/analysis/analyze_model_performance.py
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 from pathlib import Path
 import logging
+from typing import Dict, Optional, List
 
 try:
     from marketml.configs import configs
     from marketml.utils import logger_setup
-except ImportError:
-    print("CRITICAL ERROR in analyze_model_performance.py: Could not import 'marketml.configs' or 'marketml.utils.logger_setup'.")
+    from marketml.analysis.plot_utils import (
+        plot_cumulative_portfolio_value,
+        plot_drawdown_curves,
+        plot_daily_returns_distribution,
+        plot_key_metrics_comparison,
+        plot_annualized_return_vs_volatility,
+        plot_rolling_sharpe_ratio
+    )
+    # Thêm import plotly visualizer từ code mới
+    from marketml.analysis import plot_utils as plotly_visualizer
+except ImportError as e:
+    print(f"CRITICAL ERROR in analyze_model_performance.py: {e}")
+    
+    # Fallback configuration (giữ nguyên từ code cũ)
     class FallbackConfigs:
         RESULTS_OUTPUT_DIR = Path(__file__).resolve().parents[2] / "results_output"
         MODEL_PERF_SUMMARY_FILE = RESULTS_OUTPUT_DIR / "model_performance_summary.csv"
         MODEL_PERF_DETAILED_FILE = RESULTS_OUTPUT_DIR / "model_performance_detailed.csv"
+        MARKOWITZ_RISK_FREE_RATE = 0.02
+        RL_ALGORITHM = "PPO"
+    
     configs = FallbackConfigs()
-    # Fallback logger
+    
+    # Fallback logger setup (giữ nguyên từ code cũ)
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger("analyzer_fallback")
-    logger.warning("Using fallback configs and logger for analyze_model_performance.py.")
+    logger.warning("Using fallback configs and logger for analyze_model_performance.py")
 
+    # Thêm DummyPlotter từ code mới
+    class DummyPlotter:
+        def __getattr__(self, name):
+            def _missing_plot(*args, **kwargs):
+                logger.error(f"Plotly plotting function '{name}' called, but plotly_visualizer could not be imported.")
+            return _missing_plot
+    plotly_visualizer = DummyPlotter()
 
+# Initialize logger if not already set up (giữ nguyên từ code cũ)
 if 'logger' not in locals():
-    logger = logger_setup.setup_basic_logging(log_file_name="analyze_performance.log")
+    logger = logger_setup.setup_basic_logging(log_file_name="analyze_model_performance.log") if 'logger_setup' in globals() else logging.getLogger(__name__)
 
-# --- Get configuration from configs.py ---
+# Configuration paths (giữ nguyên từ code cũ)
 SUMMARY_FILE_PATH = configs.MODEL_PERF_SUMMARY_FILE
 DETAILED_FILE_PATH = configs.MODEL_PERF_DETAILED_FILE
-PLOTS_SAVE_DIR = configs.RESULTS_OUTPUT_DIR # Save plots in the same directory as results CSV
+PLOTS_SAVE_DIR = configs.RESULTS_OUTPUT_DIR / "performance_plots"
 
-# --- Constants that can be moved to configs.py if desired ---
-# Example: configs.ANALYSIS_METRICS_TO_PLOT, configs.ANALYSIS_MODEL_NAMES
+# Analysis constants (giữ nguyên từ code cũ)
 METRICS_SUFFIXES_TO_PLOT = getattr(configs, 'ANALYSIS_METRICS_SUFFIXES', [
     "_Accuracy", "_F1_Macro", "_F1_Weighted", "_Precision_Macro", "_Recall_Macro"
 ])
-MODEL_NAMES_TO_ANALYZE = getattr(configs, 'ANALYSIS_MODEL_NAMES', ["ARIMA", "RandomForest", "XGBoost", "LSTM", "Transformer", "SVM"])
+MODEL_NAMES_TO_ANALYZE = getattr(configs, 'ANALYSIS_MODEL_NAMES', [
+    "ARIMA", "RandomForest", "XGBoost", "LSTM", "Transformer", "SVM"
+])
+PORTFOLIO_STRATEGIES = getattr(configs, 'PORTFOLIO_STRATEGIES', [
+    "Markowitz", "BlackLitterman", "RL_Strategy"
+])
+PORTFOLIO_METRICS = getattr(configs, 'PORTFOLIO_KEY_METRICS', [
+    'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio', 'Max Drawdown'
+])
+ROLLING_WINDOWS = getattr(configs, 'ROLLING_SHARPE_WINDOWS', [30, 60, 90])
 
-
-def load_summary_results(file_path: Path) -> pd.DataFrame | None:
-    logger.info(f"Loading performance summary from: {file_path}")
+def load_performance_data(file_path: Path, index_col: Optional[str] = None) -> Optional[pd.DataFrame]:
+    """Load performance data from CSV file (giữ nguyên định nghĩa từ code cũ)."""
     try:
-        df_summary = pd.read_csv(file_path, index_col=0) # metric name is index
-        logger.info("Summary loaded successfully.")
-        return df_summary
+        logger.info(f"Loading performance data from: {file_path}")
+        df = pd.read_csv(file_path, index_col=index_col, parse_dates=True if index_col == 'date' else False)
+        if df.empty:
+            logger.warning(f"Loaded empty DataFrame from {file_path}")
+            return None
+        return df
     except FileNotFoundError:
-        logger.error(f"Summary file not found at '{file_path}'. "
-                     "Please run '02_train_forecasting_models.py' to generate results first.")
-        return None
+        logger.error(f"File not found at '{file_path}'")
     except Exception as e:
-        logger.error(f"Error loading summary file '{file_path}': {e}", exc_info=True)
-        return None
+        logger.error(f"Error loading file '{file_path}': {e}", exc_info=True)
+    return None
 
-def plot_mean_performance(df_summary: pd.DataFrame, metrics_suffixes: list, model_names: list, save_dir: Path):
-    if df_summary is None or df_summary.empty or 'mean' not in df_summary.columns:
-        logger.warning("No valid summary data or 'mean' column to plot for mean performance.")
-        return
-
-    plot_data_list = []
-    for model_prefix in model_names:
-        for metric_suffix in metrics_suffixes:
-            full_metric_name = model_prefix + metric_suffix
-            if full_metric_name in df_summary.index:
-                 plot_data_list.append({
-                     'Model': model_prefix,
-                     'Metric': metric_suffix.replace("_", " "), # Clean name for plot
-                     'Mean_Performance': df_summary.loc[full_metric_name, 'mean']
-                 })
-
-    if not plot_data_list:
-        logger.warning("No data to plot for mean performance after filtering metrics and models.")
-        return
-
-    plot_df = pd.DataFrame(plot_data_list)
-    plot_df.sort_values(by=['Metric', 'Mean_Performance'], ascending=[True, False], inplace=True)
-
-    plt.figure(figsize=(15, 8))
-    sns.barplot(x='Metric', y='Mean_Performance', hue='Model', data=plot_df, palette='viridis')
-    plt.title('Mean Model Performance Comparison Across CV Splits', fontsize=16)
-    plt.ylabel('Mean Score', fontsize=12)
-    plt.xlabel('Metric', fontsize=12)
-    plt.xticks(rotation=45, ha='right', fontsize=10)
-    plt.yticks(fontsize=10)
-    plt.legend(title='Model', fontsize=10, title_fontsize=12, loc='best') # 'center left' may be cut off
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.tight_layout(pad=1.5) # Add padding
-
-    try:
-        save_dir.mkdir(parents=True, exist_ok=True)
-        plot_output_path = save_dir / "mean_performance_comparison.png"
-        plt.savefig(plot_output_path)
-        logger.info(f"Mean performance comparison plot saved to: {plot_output_path.resolve()}")
-        plt.show()
-        plt.close()
-    except Exception as e:
-        logger.error(f"Error saving mean performance plot: {e}", exc_info=True)
-
-
-def plot_performance_distribution(detailed_results_path: Path, metrics_suffixes: list, model_names: list, save_dir: Path):
-    logger.info(f"Attempting to load detailed results from: {detailed_results_path}")
-    try:
-        df_detailed = pd.read_csv(detailed_results_path)
-    except FileNotFoundError:
-        logger.warning(f"Detailed results file not found at '{detailed_results_path}'. Skipping distribution plot.")
-        return
-    except Exception as e:
-        logger.error(f"Error loading detailed results file '{detailed_results_path}': {e}", exc_info=True)
-        return
-
-    if df_detailed.empty or len(df_detailed) <= 1: # Need at least 2 splits for boxplot to be meaningful
-        logger.warning("Not enough splits/data in detailed results to plot distribution (need at least 2 splits).")
-        return
-
-    # Filter columns to plot based on available model_metric combinations
-    metrics_to_plot_full = []
-    for model_prefix in model_names:
-        for metric_suffix in metrics_suffixes:
-            full_metric_name = model_prefix + metric_suffix
-            if full_metric_name in df_detailed.columns:
-                metrics_to_plot_full.append(full_metric_name)
+def analyze_forecasting_models() -> None:
+    """Analyze and visualize forecasting model performance (kết hợp cả hai phiên bản)."""
+    logger.info("--- Analyzing Forecasting Model Performance ---")
     
-    if not metrics_to_plot_full:
-        logger.warning("No specified metrics found in the detailed data to plot distribution.")
+    # Sử dụng load_performance_data từ code cũ
+    df_summary = load_performance_data(SUMMARY_FILE_PATH, index_col=0)
+    if df_summary is None:
+        logger.warning("No summary data available for forecasting models.")
         return
-
-    plot_data_melted = pd.melt(df_detailed, value_vars=metrics_to_plot_full,
-                               var_name='Metric_Model', value_name='Score')
     
-    # Extract Model and Metric for hue and x-axis
-    plot_data_melted['Model'] = plot_data_melted['Metric_Model'].apply(lambda x: x.split('_')[0])
-    plot_data_melted['Metric'] = plot_data_melted['Metric_Model'].apply(lambda x: "_".join(x.split('_')[1:]).replace("_", " "))
-
-    # Filter again for models we are interested in (in case Metric_Model had other prefixes)
-    plot_data_melted = plot_data_melted[plot_data_melted['Model'].isin(model_names)]
-    if plot_data_melted.empty:
-        logger.warning("No data left to plot for distribution after filtering by model names.")
-        return
-
-    plt.figure(figsize=(18, 10))
-    sns.boxplot(x='Metric', y='Score', hue='Model', data=plot_data_melted, palette='Set2')
-    plt.title('Model Performance Distribution Across CV Splits', fontsize=16)
-    plt.ylabel('Score', fontsize=12)
-    plt.xlabel('Metric', fontsize=12)
-    plt.xticks(rotation=45, ha='right', fontsize=10)
-    plt.yticks(fontsize=10)
-    plt.legend(title='Model', fontsize=10, title_fontsize=12, loc='best')
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.tight_layout(pad=1.5)
-
+    # Display summary statistics (giữ nguyên từ code cũ)
+    if 'mean' in df_summary.columns and 'std' in df_summary.columns:
+        df_display = df_summary.dropna(subset=['mean']).copy()
+        df_display['Mean ± Std'] = df_display.apply(
+            lambda x: f"{x['mean']:.4f} ± {x['std']:.4f}", axis=1
+        )
+        logger.info(f"\nPerformance Summary:\n{df_display[['Mean ± Std']].to_string()}")
+    
+    # Thêm Plotly visualizations từ code mới
     try:
-        save_dir.mkdir(parents=True, exist_ok=True)
-        plot_output_path = save_dir / "performance_distribution.png"
-        plt.savefig(plot_output_path)
-        logger.info(f"Performance distribution plot saved to: {plot_output_path.resolve()}")
-        # plt.show()
-        plt.close()
-    except Exception as e:
-        logger.error(f"Error saving performance distribution plot: {e}", exc_info=True)
-
-
-def main():
-    logger.info("--- Analyzing Model Performance ---")
-
-    df_summary = load_summary_results(file_path=SUMMARY_FILE_PATH)
-
-    if df_summary is not None and not df_summary.empty:
-        logger.info("\n--- Performance Summary Table (Mean & Std Dev) ---")
-        df_summary_display = df_summary.copy()
-        if 'mean' in df_summary_display.columns and 'std' in df_summary_display.columns:
-            # Filter to display only rows that have a valid 'mean'
-            df_summary_display_valid = df_summary_display.dropna(subset=['mean'])
-            if not df_summary_display_valid.empty:
-                df_summary_display_valid['Mean +/- Std'] = df_summary_display_valid.apply(
-                    lambda x: f"{x['mean']:.4f} +/- {x['std']:.4f}" if pd.notna(x['std']) else f"{x['mean']:.4f}", axis=1
-                )
-                logger.info(f"\n{df_summary_display_valid[['Mean +/- Std']].to_string()}")
-            else:
-                logger.info("No metrics with valid mean values found in the summary.")
-        else:
-            logger.info(f"\n{df_summary_display.to_string()}") # Print as is if no mean/std cols
-
-        plot_mean_performance(df_summary,
-                              metrics_suffixes=METRICS_SUFFIXES_TO_PLOT,
-                              model_names=MODEL_NAMES_TO_ANALYZE,
-                              save_dir=PLOTS_SAVE_DIR)
-
+        # Kiểm tra xem plotly_visualizer có method plot_forecasting_mean_performance không
+        if hasattr(plotly_visualizer, 'plot_forecasting_mean_performance'):
+            plotly_visualizer.plot_forecasting_mean_performance(
+                df_summary=df_summary,
+                model_names=MODEL_NAMES_TO_ANALYZE,
+                metric_suffixes=METRICS_SUFFIXES_TO_PLOT,
+                save_dir=PLOTS_SAVE_DIR,
+                save_filename="forecasting_mean_performance_plotly.png"
+            )
+        
+        # Plot distribution nếu có detailed data
         if DETAILED_FILE_PATH.exists():
-             try:
-                df_detailed_check = pd.read_csv(DETAILED_FILE_PATH)
-                if len(df_detailed_check) > 1 :
-                    plot_performance_distribution(detailed_results_path=DETAILED_FILE_PATH,
-                                                  metrics_suffixes=METRICS_SUFFIXES_TO_PLOT,
-                                                  model_names=MODEL_NAMES_TO_ANALYZE,
-                                                  save_dir=PLOTS_SAVE_DIR)
-                else:
-                    logger.info(f"Skipping distribution plot: Detailed results file '{DETAILED_FILE_PATH}' has too few splits (<=1).")
-             except pd.errors.EmptyDataError:
-                 logger.warning(f"Skipping distribution plot: Detailed results file '{DETAILED_FILE_PATH}' is empty.")
-             except Exception as e_read_detail:
-                 logger.error(f"Could not read detailed results file '{DETAILED_FILE_PATH}' for pre-check: {e_read_detail}")
+            df_detailed = load_performance_data(DETAILED_FILE_PATH)
+            if df_detailed is not None and len(df_detailed) > 1:
+                if hasattr(plotly_visualizer, 'plot_forecasting_distribution'):
+                    plotly_visualizer.plot_forecasting_distribution(
+                        df_detailed=df_detailed,
+                        model_names=MODEL_NAMES_TO_ANALYZE,
+                        metric_suffixes=METRICS_SUFFIXES_TO_PLOT,
+                        save_dir=PLOTS_SAVE_DIR,
+                        save_filename="forecasting_distribution_plotly.png"
+                    )
+            elif df_detailed is not None:
+                logger.info(f"Detailed forecasting results file has too few splits (<=1). Skipping distribution plot.")
         else:
-            logger.info(f"Skipping distribution plot: Detailed results file '{DETAILED_FILE_PATH}' not found.")
-    else:
-        logger.warning("Summary data not loaded or empty. No analysis performed.")
+            logger.info(f"Detailed forecasting results file not found at {DETAILED_FILE_PATH}, skipping distribution plot.")
+    
+    except Exception as e:
+        logger.error(f"Error generating plotly forecasting plots: {e}")
 
-    logger.info("--- Analysis Finished ---")
+def analyze_portfolio_strategies() -> None:
+    """Analyze and visualize portfolio strategy performance (giữ nguyên định nghĩa từ code cũ)."""
+    logger.info("--- Analyzing Portfolio Strategy Performance ---")
+    
+    # Load strategy performance data (giữ nguyên logic từ code cũ)
+    strategy_dfs = {}
+    portfolio_strategies_to_analyze = getattr(configs, 'PORTFOLIO_STRATEGIES_TO_ANALYZE', ["Markowitz", "BlackLitterman"])
+    rl_algo_name = getattr(configs, 'RL_ALGORITHM', "PPO").upper()
+
+    # Thêm chiến lược RL vào danh sách nếu nó được bật và có tên thuật toán
+    if getattr(configs, 'RL_STRATEGY_ENABLED', False) and rl_algo_name:
+        rl_dict_key = f"RL ({rl_algo_name})"
+        if rl_dict_key not in portfolio_strategies_to_analyze:
+            portfolio_strategies_to_analyze.append(rl_dict_key)
+
+    filename_map = {
+        "Markowitz": getattr(configs, 'MARKOWITZ_PERF_DAILY_FILE_NAME', "markowitz_performance_daily.csv"),
+        "BlackLitterman": getattr(configs, 'BLACKLITTERMAN_PERF_DAILY_FILE_NAME', "blacklitterman_performance_daily.csv"),
+    }
+    # Thêm mapping cho RL nếu có
+    if getattr(configs, 'RL_STRATEGY_ENABLED', False) and rl_algo_name:
+        rl_dict_key_for_map = f"RL ({rl_algo_name})"
+        filename_map[rl_dict_key_for_map] = f"{configs.RL_ALGORITHM.lower()}_strategy_performance_daily.csv"
+
+    for strategy_display_name in portfolio_strategies_to_analyze:
+        actual_filename = filename_map.get(strategy_display_name)
+        
+        if not actual_filename:
+            logger.warning(f"No filename mapping found for strategy: {strategy_display_name}. Skipping.")
+            continue
+
+        file_path = configs.RESULTS_OUTPUT_DIR / actual_filename
+        df = load_performance_data(file_path, index_col='date')
+        if df is not None:
+            strategy_dfs[strategy_display_name] = df
+
+    if not strategy_dfs:
+        logger.warning("No portfolio strategy data available.")
+        return
+
+    # Load summary metrics (giữ nguyên từ code cũ)
+    summary_file = configs.RESULTS_OUTPUT_DIR / getattr(configs, 'PORTFOLIO_STRATEGIES_SUMMARY_FILE_NAME', "portfolio_strategies_summary.csv")
+    df_summary = load_performance_data(summary_file, index_col=0)
+
+    # Generate visualizations (giữ nguyên từ code cũ)
+    PLOTS_SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # 1. Cumulative portfolio value
+    plot_cumulative_portfolio_value(
+        performance_dfs=strategy_dfs,
+        save_dir=PLOTS_SAVE_DIR,
+        title="Portfolio Value Over Time"
+    )
+    
+    # 2. Drawdown curves
+    plot_drawdown_curves(
+        performance_dfs=strategy_dfs,
+        save_dir=PLOTS_SAVE_DIR,
+        title="Portfolio Drawdown Analysis"
+    )
+    
+    # 3. Daily returns distribution
+    plot_daily_returns_distribution(
+        performance_dfs=strategy_dfs,
+        save_dir=PLOTS_SAVE_DIR,
+        title="Daily Returns Distribution"
+    )
+    
+    # 4. Key metrics comparison (if summary data available)
+    if df_summary is not None:
+        plot_key_metrics_comparison(
+            summary_metrics_df=df_summary,
+            metrics_to_plot=PORTFOLIO_METRICS,
+            save_dir=PLOTS_SAVE_DIR,
+            title="Portfolio Performance Metrics Comparison"
+        )
+        
+        plot_annualized_return_vs_volatility(
+            summary_metrics_df=df_summary,
+            save_dir=PLOTS_SAVE_DIR,
+            title="Return vs Volatility Comparison"
+        )
+    
+    # 5. Rolling Sharpe ratios
+    risk_free_rate = getattr(configs, 'MARKOWITZ_RISK_FREE_RATE', 0.02)
+    for window in ROLLING_WINDOWS:
+        plot_rolling_sharpe_ratio(
+            performance_dfs=strategy_dfs,
+            rolling_window_days=window,
+            risk_free_rate=risk_free_rate,
+            save_dir=PLOTS_SAVE_DIR,
+            title_suffix=f" ({window}-Day Window)"
+        )
+
+    # Thêm plotly visualizations từ code mới (nếu có)
+    try:
+        if hasattr(plotly_visualizer, 'plot_cumulative_portfolio_value'):
+            plotly_visualizer.plot_cumulative_portfolio_value(
+                performance_dfs=strategy_dfs, 
+                save_dir=PLOTS_SAVE_DIR
+            )
+        
+        if hasattr(plotly_visualizer, 'plot_drawdown_curves'):
+            plotly_visualizer.plot_drawdown_curves(
+                performance_dfs=strategy_dfs, 
+                save_dir=PLOTS_SAVE_DIR
+            )
+        
+        if hasattr(plotly_visualizer, 'plot_daily_returns_distribution'):
+            plotly_visualizer.plot_daily_returns_distribution(
+                performance_dfs=strategy_dfs, 
+                use_kde=True, 
+                save_dir=PLOTS_SAVE_DIR
+            )
+        
+        if df_summary is not None and not df_summary.empty:
+            if hasattr(plotly_visualizer, 'plot_key_metrics_comparison'):
+                plotly_visualizer.plot_key_metrics_comparison(
+                    summary_metrics_df=df_summary,
+                    metrics_to_plot=PORTFOLIO_METRICS,
+                    save_dir=PLOTS_SAVE_DIR
+                )
+            
+            if hasattr(plotly_visualizer, 'plot_annualized_return_vs_volatility'):
+                plotly_visualizer.plot_annualized_return_vs_volatility(
+                    summary_metrics_df=df_summary,
+                    save_dir=PLOTS_SAVE_DIR
+                )
+        
+        # Rolling Sharpe với plotly
+        for window in ROLLING_WINDOWS:
+            if hasattr(plotly_visualizer, 'plot_rolling_sharpe_ratio'):
+                plotly_visualizer.plot_rolling_sharpe_ratio(
+                    performance_dfs=strategy_dfs,
+                    rolling_window_days=window,
+                    risk_free_rate=risk_free_rate,
+                    title_suffix=f" ({window}-Day)",
+                    save_filename_base="portfolio_rolling_sharpe",
+                    save_dir=PLOTS_SAVE_DIR
+                )
+    
+    except Exception as e:
+        logger.error(f"Error generating plotly portfolio plots: {e}")
+
+def main() -> None:
+    """Main analysis workflow (giữ nguyên từ code cũ)."""
+    logger.info("===== Starting Performance Analysis =====")
+    analyze_forecasting_models()
+    analyze_portfolio_strategies()
+    
+    logger.info("===== Analysis Completed =====")
 
 if __name__ == "__main__":
     main()

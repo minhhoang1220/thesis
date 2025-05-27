@@ -22,6 +22,19 @@ FORECASTS_OUTPUT_DIR = PROJECT_ROOT / "forecasts_output"
 LOG_OUTPUT_DIR = PROJECT_ROOT / "logs"
 PLOTS_OUTPUT_DIR = RESULTS_OUTPUT_DIR / "plots"
 
+# --- Model Performance Analysis ---
+ANALYSIS_METRICS_SUFFIXES = [
+    "_Accuracy", "_F1_Macro", "_F1_Weighted", "_Precision_Macro", "_Recall_Macro"
+]
+ANALYSIS_MODEL_NAMES = ["ARIMA", "RandomForest", "XGBoost", "LSTM", "Transformer", "SVM"]
+
+# --- Portfolio Performance Analysis ---
+PORTFOLIO_KEY_METRICS_PLOT = ['Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio', 'Max Drawdown']
+PORTFOLIO_ROLLING_SHARPE_WINDOWS = [30, 60, 90]
+MARKOWITZ_PERF_DAILY_FILE_NAME = "markowitz_performance_daily.csv"
+BLACKLITTERMAN_PERF_DAILY_FILE_NAME = "blacklitterman_performance_daily.csv"
+PORTFOLIO_STRATEGIES_SUMMARY_FILE_NAME = "portfolio_strategies_summary.csv"
+
 # --- File Names for Outputs (relative to output dirs) ---
 CLASSIFICATION_PROBS_FILE = RESULTS_OUTPUT_DIR / "classification_probabilities.csv"
 MODEL_PERF_SUMMARY_FILE = RESULTS_OUTPUT_DIR / "model_performance_summary.csv"
