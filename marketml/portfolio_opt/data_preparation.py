@@ -19,11 +19,12 @@ def load_price_data_for_portfolio(
     custom_start_date_str: str = None,
     custom_end_date_str: str = None,
     include_buffer_for_rolling: bool = True,
-    logger_instance: logging.Logger = None # Optional logger instance
+    logger_instance: logging.Logger = None
 ) -> pd.DataFrame:
+    # --- Load price data for portfolio ---
     current_logger = logger_instance if logger_instance else logger
-    source_file = configs.PRICE_DATA_FOR_PORTFOLIO_PATH # Dùng ENRICHED_DATA_FILE
-    
+    source_file = configs.PRICE_DATA_FOR_PORTFOLIO_PATH
+
     log_message_prefix = "Loading price data"
     if custom_start_date_str and custom_end_date_str:
         log_message_prefix = f"Loading custom price data ({custom_start_date_str} - {custom_end_date_str})"
@@ -41,13 +42,11 @@ def load_price_data_for_portfolio(
         current_logger.error(f"Error loading price data from {source_file}: {e}", exc_info=True)
         return pd.DataFrame()
 
-    # Select relevant columns early
     if not all(col in df_price_full.columns for col in ['date', 'ticker', 'close']):
         current_logger.error("Price data CSV must contain 'date', 'ticker', and 'close' columns.")
         return pd.DataFrame()
     df_price = df_price_full[['date', 'ticker', 'close']].copy()
 
-    # Filter by portfolio assets if specified in configs
     if configs.PORTFOLIO_ASSETS and isinstance(configs.PORTFOLIO_ASSETS, list) and len(configs.PORTFOLIO_ASSETS) > 0:
         df_price = df_price[df_price['ticker'].isin(configs.PORTFOLIO_ASSETS)].copy()
         if df_price.empty:
@@ -57,20 +56,18 @@ def load_price_data_for_portfolio(
         if missing_assets:
             current_logger.warning(f"Specified PORTFOLIO_ASSETS not found in price data: {missing_assets}")
 
-    # Determine date range for loading
     if custom_start_date_str and custom_end_date_str:
         load_start_dt_cfg = pd.to_datetime(custom_start_date_str)
         load_end_dt_cfg = pd.to_datetime(custom_end_date_str)
-        buffer_days = configs.RL_LOOKBACK_WINDOW_SIZE + 30 if include_buffer_for_rolling else 0 # Buffer for RL or general use
+        buffer_days = configs.RL_LOOKBACK_WINDOW_SIZE + 30 if include_buffer_for_rolling else 0
     else:
         load_start_dt_cfg = pd.to_datetime(configs.PORTFOLIO_START_DATE)
         load_end_dt_cfg = pd.to_datetime(configs.PORTFOLIO_END_DATE)
-        buffer_days = max(configs.ROLLING_WINDOW_COVARIANCE, configs.ROLLING_WINDOW_RETURNS) + 60 if include_buffer_for_rolling else 0 # Generous buffer
+        buffer_days = max(configs.ROLLING_WINDOW_COVARIANCE, configs.ROLLING_WINDOW_RETURNS) + 60 if include_buffer_for_rolling else 0
 
-    effective_load_start_dt = load_start_dt_cfg - pd.DateOffset(days=buffer_days * 1.5) # *1.5 for non-trading days
-    effective_load_end_dt = load_end_dt_cfg # No buffer at the end usually
+    effective_load_start_dt = load_start_dt_cfg - pd.DateOffset(days=buffer_days * 1.5)
+    effective_load_end_dt = load_end_dt_cfg
 
-    # Ensure effective_load_start_dt is not before the earliest data available from global config
     min_overall_date = pd.to_datetime(configs.TIME_RANGE_START)
     effective_load_start_dt = max(effective_load_start_dt, min_overall_date)
 
@@ -84,14 +81,10 @@ def load_price_data_for_portfolio(
         return pd.DataFrame()
 
     df_price_pivot = df_price_filtered.pivot(index='date', columns='ticker', values='close')
-    df_price_pivot.sort_index(inplace=True) # Ensure date index is sorted
+    df_price_pivot.sort_index(inplace=True)
 
-    # Fill NaNs carefully. ffill is generally safer than bfill for price series.
     df_price_pivot = df_price_pivot.ffill()
-    # Drop columns (tickers) that are ALL NaN after ffill (meaning they had no data in the entire period)
     df_price_pivot.dropna(axis=1, how='all', inplace=True)
-    # Optional: bfill for any remaining NaNs at the beginning of some series. Use with caution.
-    # df_price_pivot = df_price_pivot.bfill()
 
     if df_price_pivot.empty:
         current_logger.error(f"Price data pivot is empty after processing for range {effective_load_start_dt.date()} - {effective_load_end_dt.date()}.")
@@ -103,6 +96,7 @@ def load_price_data_for_portfolio(
     return df_price_pivot
 
 def load_financial_data_for_portfolio(logger_instance: logging.Logger = None) -> pd.DataFrame:
+    # --- Load financial data for portfolio ---
     current_logger = logger_instance if logger_instance else logger
     file_path = configs.RAW_GLOBAL_FINANCIAL_FILE
     current_logger.info(f"Loading financial data from: {file_path}")
@@ -113,7 +107,7 @@ def load_financial_data_for_portfolio(logger_instance: logging.Logger = None) ->
             return pd.DataFrame()
     except FileNotFoundError:
         current_logger.error(f"Financial data file not found: {file_path}")
-        return pd.DataFrame() # Return empty DataFrame instead of None
+        return pd.DataFrame()
     except Exception as e:
         current_logger.error(f"Error loading financial data from {file_path}: {e}", exc_info=True)
         return pd.DataFrame()
@@ -123,14 +117,11 @@ def load_financial_data_for_portfolio(logger_instance: logging.Logger = None) ->
         current_logger.error("Financial data CSV must contain a 'year' column.")
         return pd.DataFrame()
     try:
-        # Convert 'year' to integer year for easier filtering.
-        # If 'year' is already YYYY format, direct to_numeric might be enough.
-        # If 'year' could be YYYY-MM-DD, then parse as datetime first.
         if pd.api.types.is_datetime64_any_dtype(df_fin['year']):
             df_fin['year_dt'] = df_fin['year'].dt.year
-        else: # Try to convert to numeric, assuming it's just year
+        else:
             df_fin['year_dt'] = pd.to_numeric(df_fin['year'], errors='coerce').fillna(0).astype(int)
-            if (df_fin['year_dt'] < 1900).any() or (df_fin['year_dt'] > 2100).any(): # Sanity check
+            if (df_fin['year_dt'] < 1900).any() or (df_fin['year_dt'] > 2100).any():
                  current_logger.warning("Unusual year values found in financial data after conversion.")
     except Exception as e:
         current_logger.error(f"Error processing 'year' column in financial data: {e}", exc_info=True)
@@ -143,8 +134,9 @@ def load_financial_data_for_portfolio(logger_instance: logging.Logger = None) ->
     return df_fin
 
 def load_classification_probabilities(logger_instance: logging.Logger = None) -> pd.DataFrame:
+    # --- Load classification probabilities ---
     current_logger = logger_instance if logger_instance else logger
-    file_path = configs.CLASSIFICATION_PROBS_FILE # Using new config name
+    file_path = configs.CLASSIFICATION_PROBS_FILE
     current_logger.info(f"Loading classification probabilities from: {file_path}")
     try:
         df_probs = pd.read_csv(file_path, parse_dates=['date'])
@@ -153,48 +145,47 @@ def load_classification_probabilities(logger_instance: logging.Logger = None) ->
             return pd.DataFrame()
     except FileNotFoundError:
         current_logger.warning(f"Classification probabilities file not found at {file_path}. Proceeding without it.")
-        return pd.DataFrame() # Return empty DataFrame
+        return pd.DataFrame()
     except Exception as e:
         current_logger.error(f"Error loading classification probabilities from {file_path}: {e}", exc_info=True)
         return pd.DataFrame()
 
-
     if configs.PORTFOLIO_ASSETS and isinstance(configs.PORTFOLIO_ASSETS, list) and len(configs.PORTFOLIO_ASSETS) > 0:
         df_probs = df_probs[df_probs['ticker'].isin(configs.PORTFOLIO_ASSETS)].copy()
 
-    # Construct the expected probability column name
     prob_col_name = f"prob_increase_{configs.SOFT_SIGNAL_MODEL_NAME}"
     if prob_col_name not in df_probs.columns:
         current_logger.warning(f"Expected probability column '{prob_col_name}' not found in {file_path}. "
                                f"Checking for other 'prob_increase' columns...")
-        found_prob_cols = [col for col in df_probs.columns if 'prob_increase' in col.lower()] # Case-insensitive check
+        found_prob_cols = [col for col in df_probs.columns if 'prob_increase' in col.lower()]
         if found_prob_cols:
-            prob_col_name = found_prob_cols[0] # Use the first one found
+            prob_col_name = found_prob_cols[0]
             current_logger.info(f"Using auto-detected probability column: '{prob_col_name}'")
         else:
             current_logger.error("No 'prob_increase' column found in classification probabilities. Cannot use this data.")
-            return pd.DataFrame() # Return empty if no suitable column
+            return pd.DataFrame()
 
     current_logger.info(f"Classification probabilities loaded. Shape: {df_probs.shape}. Using prob col: '{prob_col_name}'")
     return df_probs
 
 def calculate_returns(price_df_pivot: pd.DataFrame, logger_instance: logging.Logger = None) -> pd.DataFrame:
+    # --- Calculate daily returns ---
     current_logger = logger_instance if logger_instance else logger
     if price_df_pivot.empty:
         current_logger.warning("Price data pivot is empty, cannot calculate returns.")
         return pd.DataFrame()
     daily_returns = price_df_pivot.pct_change()
-    # First row will be NaN after pct_change()
     return daily_returns.iloc[1:]
 
 def get_prepared_data_for_rebalance_date(
     rebalance_date: pd.Timestamp,
-    all_prices_pivot: pd.DataFrame, # Should be prices from [buffer_start, portfolio_end] for valid_tickers
-    all_daily_returns: pd.DataFrame, # Corresponding returns
-    financial_data_filtered: pd.DataFrame = None, # Filtered to valid_tickers
-    classification_probs_filtered: pd.DataFrame = None, # Filtered to valid_tickers
+    all_prices_pivot: pd.DataFrame,
+    all_daily_returns: pd.DataFrame,
+    financial_data_filtered: pd.DataFrame = None,
+    classification_probs_filtered: pd.DataFrame = None,
     logger_instance: logging.Logger = None
 ):
+    # --- Prepare data for a rebalance date ---
     current_logger = logger_instance if logger_instance else logger
     current_logger.debug(f"Preparing data for rebalance date: {rebalance_date.date()}")
 
@@ -203,11 +194,10 @@ def get_prepared_data_for_rebalance_date(
         current_logger.error("No asset tickers in all_prices_pivot. Cannot prepare data.")
         return pd.Series(dtype=float), pd.DataFrame(), {}, {}
 
-    # --- 1. Expected Returns (mu) - ANNUALIZED ---
-    # Historical mean returns with rolling window, ending *before* rebalance_date
+    # 1. Expected Returns (mu) - ANNUALIZED
     returns_for_mu_calc = all_daily_returns[all_daily_returns.index < rebalance_date]
     
-    mu_annualized = pd.Series(0.0, index=asset_tickers, dtype=float) # Default to 0
+    mu_annualized = pd.Series(0.0, index=asset_tickers, dtype=float)
     if not returns_for_mu_calc.empty:
         window_returns = configs.ROLLING_WINDOW_RETURNS
         if len(returns_for_mu_calc) >= window_returns:
@@ -215,37 +205,32 @@ def get_prepared_data_for_rebalance_date(
         else:
             daily_mu = returns_for_mu_calc.mean()
             current_logger.debug(f"Mu calc: Using {len(returns_for_mu_calc)} days (less than window {window_returns}) for {rebalance_date.date()}.")
-        mu_annualized = daily_mu * 252 # Arithmetic annualization
-        mu_annualized = mu_annualized.reindex(asset_tickers).fillna(0.0) # Ensure all assets covered, fill NaN with 0
+        mu_annualized = daily_mu * 252
+        mu_annualized = mu_annualized.reindex(asset_tickers).fillna(0.0)
     current_logger.debug(f"Annualized mu for {rebalance_date.date()} (sample): {mu_annualized.head().to_dict()}")
 
-    # --- 2. Covariance Matrix (S) - ANNUALIZED ---
-    S_annualized = pd.DataFrame(np.diag(np.full(len(asset_tickers), 1e-9)), index=asset_tickers, columns=asset_tickers) # Default low-variance diagonal
-    prices_for_cov_calc = all_prices_pivot[all_prices_pivot.index < rebalance_date] # Prices up to day before rebalance
+    # 2. Covariance Matrix (S) - ANNUALIZED
+    S_annualized = pd.DataFrame(np.diag(np.full(len(asset_tickers), 1e-9)), index=asset_tickers, columns=asset_tickers)
+    prices_for_cov_calc = all_prices_pivot[all_prices_pivot.index < rebalance_date]
     
     if not prices_for_cov_calc.empty:
         window_cov = configs.ROLLING_WINDOW_COVARIANCE
-        # Use prices from the last 'window_cov' days available before rebalance_date
-        # Ensure the slice has enough data points for meaningful covariance
         if len(prices_for_cov_calc) >= window_cov:
             price_slice_for_cov = prices_for_cov_calc.iloc[-window_cov:]
-        elif len(prices_for_cov_calc) >= len(asset_tickers) and len(prices_for_cov_calc) >= 2: # Min for cov, but prefer more
+        elif len(prices_for_cov_calc) >= len(asset_tickers) and len(prices_for_cov_calc) >= 2:
             price_slice_for_cov = prices_for_cov_calc
             current_logger.debug(f"Cov calc: Using {len(price_slice_for_cov)} price points (less than window {window_cov}) for {rebalance_date.date()}.")
         else:
-            price_slice_for_cov = pd.DataFrame() # Not enough data
+            price_slice_for_cov = pd.DataFrame()
 
         if not price_slice_for_cov.empty:
             try:
-                # PyPortfolioOpt's CovarianceShrinkage expects prices and annualizes internally
-                # Ensure no all-NaN columns in the slice passed to CovarianceShrinkage
                 price_slice_for_cov_cleaned = price_slice_for_cov.dropna(axis=1, how='all')
-                if not price_slice_for_cov_cleaned.empty and price_slice_for_cov_cleaned.shape[0] >= price_slice_for_cov_cleaned.shape[1] : # rows >= cols
+                if not price_slice_for_cov_cleaned.empty and price_slice_for_cov_cleaned.shape[0] >= price_slice_for_cov_cleaned.shape[1]:
                     S_calc_annual = risk_models.CovarianceShrinkage(price_slice_for_cov_cleaned, frequency=252).ledoit_wolf()
                     S_annualized = S_calc_annual.reindex(index=asset_tickers, columns=asset_tickers).fillna(0)
                 else:
                     current_logger.warning(f"Covariance Shrinkage condition not met for {rebalance_date.date()} (data shape {price_slice_for_cov_cleaned.shape}). Using sample covariance or diagonal.")
-                    # Fallback to sample covariance if shrinkage fails or conditions not met
                     daily_returns_slice_for_cov = price_slice_for_cov.pct_change().iloc[1:]
                     if len(daily_returns_slice_for_cov) >= 2:
                         S_daily_sample = daily_returns_slice_for_cov.cov()
@@ -253,20 +238,17 @@ def get_prepared_data_for_rebalance_date(
                     
             except Exception as e_cov:
                 current_logger.error(f"Error calculating annualized covariance matrix for {rebalance_date.date()}: {e_cov}", exc_info=True)
-                # S_annualized remains default diagonal
         
-        for ticker_idx in S_annualized.index: # Ensure positive diagonal
+        for ticker_idx in S_annualized.index:
             if S_annualized.loc[ticker_idx, ticker_idx] <= 1e-9:
                 S_annualized.loc[ticker_idx, ticker_idx] = 1e-9
     current_logger.debug(f"Annualized S for {rebalance_date.date()} (sample of diagonal): {np.diag(S_annualized)[:5]}")
 
-
-    # --- 3. Financial Data for the rebalance_date (typically from previous year-end) ---
-    current_financial_data_dict = {} # {ticker: {metric: value}}
+    # 3. Financial Data for the rebalance_date
+    current_financial_data_dict = {}
     if financial_data_filtered is not None and not financial_data_filtered.empty:
         target_financial_year = rebalance_date.year - 1
         current_logger.debug(f"Fetching financial data for year: {target_financial_year} (rebalance date: {rebalance_date.date()})")
-        # Ensure 'year_dt' column exists
         if 'year_dt' in financial_data_filtered.columns:
             relevant_fin_data_for_year = financial_data_filtered[financial_data_filtered['year_dt'] == target_financial_year]
             if not relevant_fin_data_for_year.empty:
@@ -278,24 +260,23 @@ def get_prepared_data_for_rebalance_date(
     else:
         current_logger.debug(f"No financial data provided or it's empty for {rebalance_date.date()}.")
 
-    # --- 4. Classification Probabilities for the rebalance_date (latest available on or before) ---
-    current_classification_probs_dict = {ticker: 0.5 for ticker in asset_tickers} # Default to neutral
+    # 4. Classification Probabilities for the rebalance_date
+    current_classification_probs_dict = {ticker: 0.5 for ticker in asset_tickers}
     if classification_probs_filtered is not None and not classification_probs_filtered.empty:
-        # Get the latest probabilities on or before the rebalance_date for each ticker
         relevant_probs_before_rebal = classification_probs_filtered[classification_probs_filtered['date'] <= rebalance_date]
         if not relevant_probs_before_rebal.empty:
             latest_probs_records = relevant_probs_before_rebal.loc[relevant_probs_before_rebal.groupby('ticker')['date'].idxmax()]
             
             prob_col_to_use = f"prob_increase_{configs.SOFT_SIGNAL_MODEL_NAME}"
-            if prob_col_to_use not in latest_probs_records.columns: # Fallback if exact name not found
+            if prob_col_to_use not in latest_probs_records.columns:
                 found_cols = [col for col in latest_probs_records.columns if 'prob_increase' in col.lower()]
                 if found_cols: prob_col_to_use = found_cols[0]
                 else: prob_col_to_use = None
 
             if prob_col_to_use:
                 temp_probs_dict = latest_probs_records.set_index('ticker')[prob_col_to_use].to_dict()
-                for ticker in asset_tickers: # Ensure all portfolio assets are covered
-                    current_classification_probs_dict[ticker] = temp_probs_dict.get(ticker, 0.5) # Default 0.5 if no prob for a ticker
+                for ticker in asset_tickers:
+                    current_classification_probs_dict[ticker] = temp_probs_dict.get(ticker, 0.5)
             else:
                 current_logger.warning(f"Could not find a suitable 'prob_increase' column in classification_probs for {rebalance_date.date()}. Using defaults.")
     else:
@@ -308,7 +289,7 @@ def get_prepared_data_for_rebalance_date(
     return mu_annualized, S_annualized, current_financial_data_dict, current_classification_probs_dict
 
 if __name__ == '__main__':
-    # This section is for quick testing of functions in this file.
+    # --- Main test section ---
     main_logger = logger_setup.setup_basic_logging(log_file_name="data_preparation_test.log")
     main_logger.info("--- Testing data_preparation.py functions ---")
     
@@ -319,8 +300,7 @@ if __name__ == '__main__':
         daily_returns_main = calculate_returns(prices_pivot_main, logger_instance=main_logger)
         financial_data_main = load_financial_data_for_portfolio(logger_instance=main_logger)
         
-        # Dummy classification_probabilities.csv creation if needed for testing
-        if not configs.CLASSIFICATION_PROBS_FILE.exists(): # Use new config name
+        if not configs.CLASSIFICATION_PROBS_FILE.exists():
             main_logger.warning(f"File {configs.CLASSIFICATION_PROBS_FILE} not found. Creating a dummy for testing.")
             dummy_dates_main = pd.date_range(start=configs.PORTFOLIO_START_DATE, end=configs.PORTFOLIO_END_DATE, freq='B')
             dummy_tickers_main = configs.PORTFOLIO_ASSETS if configs.PORTFOLIO_ASSETS else prices_pivot_main.columns.tolist()[:2]
@@ -336,7 +316,6 @@ if __name__ == '__main__':
                  main_logger.info(f"Created DUMMY classification probabilities at: {configs.CLASSIFICATION_PROBS_FILE}")
             else:
                 main_logger.error("Could not create dummy probability file (no tickers).")
-
 
         classification_probs_main = load_classification_probabilities(logger_instance=main_logger)
 

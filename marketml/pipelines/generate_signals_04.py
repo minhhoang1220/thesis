@@ -3,16 +3,13 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
-# import sys # Sẽ không cần nữa
-import logging # Đã import ở trên, nhưng để rõ ràng
+import logging
 
-# ===== Import các module từ marketml và configs =====
+# ===== Imports from marketml and configs =====
 try:
     from marketml.configs import configs
-    # Sửa đường dẫn import cho preprocess
     from marketml.data_handling import preprocess
-    from marketml.models import xgboost_model # Hoặc model bạn chọn (RF, SVM)
-    # Sửa đường dẫn import cho logger_setup
+    from marketml.models import xgboost_model
     from marketml.utils import logger_setup
     from sklearn.preprocessing import StandardScaler
     from sklearn.impute import SimpleImputer
@@ -21,13 +18,13 @@ except ImportError as e:
     print("Ensure the marketml package is installed correctly or PYTHONPATH is set.")
     raise
 
-# ===== Thiết lập Logger và môi trường =====
+# ===== Logger and environment setup =====
 logger = logger_setup.setup_basic_logging(log_file_name="generate_signals.log")
 logger_setup.suppress_common_warnings()
-if hasattr(configs, 'RANDOM_SEED'): # Kiểm tra xem RANDOM_SEED có tồn tại trong configs không
+if hasattr(configs, 'RANDOM_SEED'):
     logger_setup.set_random_seeds(configs.RANDOM_SEED)
 
-# ===== Kiểm tra XGBoost (nếu là model được chọn) =====
+# ===== XGBoost check (if selected model) =====
 XGB_INSTALLED = False
 if configs.SOFT_SIGNAL_MODEL_NAME == 'XGBoost':
     try:
@@ -35,7 +32,6 @@ if configs.SOFT_SIGNAL_MODEL_NAME == 'XGBoost':
         XGB_INSTALLED = True
     except ImportError:
         logger.error("XGBoost selected as SOFT_SIGNAL_MODEL_NAME, but xgboost library is not installed. This pipeline will likely fail.")
-        # Không exit ở đây, để hàm train_soft_signal_model xử lý lỗi nếu XGBoost không thể import
 
 
 def prepare_data_for_signal_generation(df_full, feature_cols, lag_periods,
@@ -51,39 +47,29 @@ def prepare_data_for_signal_generation(df_full, feature_cols, lag_periods,
         logger.warning(f"No data found in the specified date range: {start_date_filter} to {end_date_filter}")
         return None, None, None, None, None
 
-    # ---- Create Target (only for training set) ----
+    # ---- Target creation (only for training set) ----
     if fit_imputer_scaler:
         df_filtered[target_col_pct] = df_filtered.groupby('ticker')['close'].pct_change().shift(-1)
         conditions = [
             (df_filtered[target_col_pct] > trend_threshold),
             (df_filtered[target_col_pct] < -trend_threshold)
         ]
-        choices = [1, -1] # Up (1), Down (-1)
-        df_filtered[target_col_trend] = np.select(conditions, choices, default=0) # Neutral (0)
+        choices = [1, -1]
+        df_filtered[target_col_trend] = np.select(conditions, choices, default=0)
 
-    # ---- Create Lagged Features ----
-    # Create a temporary copy to avoid SettingWithCopyWarning on df_full
+    # ---- Lagged features creation ----
     df_with_lags_temp = df_full.copy()
     df_with_lags_temp['pct_change_temp'] = df_with_lags_temp.groupby('ticker')['close'].pct_change()
 
     for p in lag_periods:
         lag_col_name = f'pct_change_lag_{p}'
-        # Create lagged feature on the temporary df
         df_with_lags_temp[lag_col_name] = df_with_lags_temp.groupby('ticker')['pct_change_temp'].shift(p)
-        # Join only the new lag column to df_filtered, matching on index
-        # This assumes df_filtered's index is a unique identifier (like default RangeIndex or a DatetimeIndex if df_full was indexed by date)
-        # If df_full and df_filtered have multi-index (date, ticker), join might be more complex or need reset_index first
-        if df_filtered.index.equals(df_with_lags_temp.index): # Simple case: same index
+        if df_filtered.index.equals(df_with_lags_temp.index):
              df_filtered[lag_col_name] = df_with_lags_temp[lag_col_name]
-        else: # More robust join if indices differ or parts of df_full were dropped
-            # Requires df_filtered and df_with_lags_temp to have common columns for merging (e.g., 'date', 'ticker')
-            # For simplicity, assuming index alignment after date filtering. If not, this needs adjustment.
-            # A common approach if `df_filtered` is a subset:
+        else:
             df_filtered = df_filtered.join(df_with_lags_temp[[lag_col_name]], how='left')
 
-
-    # ---- Impute & Align Features ----
-    # Check if all feature_cols actually exist in df_filtered after joins
+    # ---- Impute & align features ----
     actual_feature_cols = [col for col in feature_cols if col in df_filtered.columns]
     missing_from_filtered = set(feature_cols) - set(actual_feature_cols)
     if missing_from_filtered:
@@ -107,9 +93,7 @@ def prepare_data_for_signal_generation(df_full, feature_cols, lag_periods,
         X_scaled_np = scaler.fit_transform(X_imputed_np)
         
         y_ml_series = df_filtered[target_col_trend].copy()
-        # Align X and y by dropping NaNs from y (target) and corresponding X rows
         valid_y_idx = y_ml_series.dropna().index
-        # Ensure indices exist in X_raw before .loc
         valid_idx_in_X = X_raw.index.intersection(valid_y_idx)
 
         if valid_idx_in_X.empty:
@@ -123,13 +107,12 @@ def prepare_data_for_signal_generation(df_full, feature_cols, lag_periods,
             logger.error("X_scaled_final or y_ml_final is empty after NaN drop in training data. Aborting.")
             return None, None, None, None, None
         
-        y_ml_mapped = y_ml_final.replace({-1: 0, 0: 1, 1: 2}).values # Target for XGBoost: 0, 1, 2
+        y_ml_mapped = y_ml_final.replace({-1: 0, 0: 1, 1: 2}).values
         
-        # df_info should also be aligned with X_scaled_final
         df_info_columns = ['date', 'ticker'] + actual_feature_cols
         df_info = df_filtered.loc[X_scaled_final.index, [col for col in df_info_columns if col in df_filtered.columns]].copy()
         return X_scaled_final.values, y_ml_mapped, imputer, scaler, df_info
-    else: # For prediction set
+    else:
         if existing_imputer is None or existing_scaler is None:
             logger.error("Imputer and Scaler must be provided for prediction data preparation.")
             return None, None, None, None, None
@@ -157,11 +140,11 @@ def train_soft_signal_model(X_train, y_train_mapped):
             'learning_rate': getattr(configs, 'LR_XGB_SOFT_SIGNAL', 0.05),
             'max_depth': getattr(configs, 'MAX_DEPTH_XGB_SOFT_SIGNAL', 5),
             'objective': 'multi:softmax',
-            'num_class': 3, # For Down (-1 -> 0), Neutral (0 -> 1), Up (1 -> 2)
+            'num_class': 3,
             'eval_metric': 'mlogloss',
             'random_state': configs.RANDOM_SEED
         }
-        model = xgboost_model.xgb.XGBClassifier(**xgb_params) # Assumes xgboost_model.xgb is the xgboost module
+        model = xgboost_model.xgb.XGBClassifier(**xgb_params)
         model.fit(X_train, y_train_mapped)
         logger.info(f"{model_name} trained successfully.")
         return model
@@ -206,7 +189,7 @@ def main():
         target_col_pct=configs.TARGET_COL_PCT,
         target_col_trend=configs.TARGET_COL_TREND,
         trend_threshold=configs.TREND_THRESHOLD,
-        start_date_filter=configs.TIME_RANGE_START, # Or a more specific training start
+        start_date_filter=configs.TIME_RANGE_START,
         end_date_filter=configs.SOFT_SIGNAL_TRAIN_END_DATE,
         fit_imputer_scaler=True
     )
@@ -258,12 +241,12 @@ def main():
     output_df = df_predict_info[['date', 'ticker']].copy()
     
     model_name_suffix = configs.SOFT_SIGNAL_MODEL_NAME
-    output_df[f"prob_decrease_{model_name_suffix}"] = probabilities[:, 0] # Class 0 (Mapped from -1)
-    output_df[f"prob_neutral_{model_name_suffix}"] = probabilities[:, 1]  # Class 1 (Mapped from 0)
-    output_df[f"prob_increase_{model_name_suffix}"] = probabilities[:, 2] # Class 2 (Mapped from 1)
+    output_df[f"prob_decrease_{model_name_suffix}"] = probabilities[:, 0]
+    output_df[f"prob_neutral_{model_name_suffix}"] = probabilities[:, 1]
+    output_df[f"prob_increase_{model_name_suffix}"] = probabilities[:, 2]
 
     try:
-        output_path = configs.CLASSIFICATION_PROBS_FILE # Updated to use new config name
+        output_path = configs.CLASSIFICATION_PROBS_FILE
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_df.to_csv(output_path, index=False)
         logger.info(f"Successfully generated and saved soft signals to: {output_path}")
@@ -278,3 +261,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

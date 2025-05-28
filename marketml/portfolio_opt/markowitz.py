@@ -1,4 +1,5 @@
 # marketml/portfolio_opt/markowitz.py
+
 import pandas as pd
 import numpy as np
 from pypfopt import EfficientFrontier, objective_functions
@@ -24,8 +25,10 @@ def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame, logger_instance
     Returns:
         dict: Dictionary of optimal weights {ticker: weight}, or equal weights on failure.
     """
+    # Section: Logger selection
     current_logger = logger_instance if logger_instance else logger
 
+    # Section: Input validation and fallback to equal weights
     if mu is None or S is None or mu.empty or S.empty:
         current_logger.error("Expected returns (mu) or Covariance matrix (S) is missing or empty for Markowitz optimization.")
         num_assets = 0
@@ -44,31 +47,24 @@ def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame, logger_instance
             current_logger.error("Cannot determine number of assets for default equal weights as mu and S are unusable.")
             return {}
 
-    # Align mu and S to common tickers and handle NaNs
+    # Section: Align and clean input data
     common_tickers = mu.index.intersection(S.index).unique()
     if not common_tickers.any():
         current_logger.error("No common tickers found between mu and S. Cannot optimize.")
         return {ticker: 1.0 / len(mu.index) for ticker in mu.index} if not mu.empty else {}
 
-
     mu_cleaned = mu.loc[common_tickers].fillna(0.0)
     S_cleaned = S.loc[common_tickers, common_tickers].fillna(0.0)
 
-    # Ensure diagonal of S_cleaned is positive
+    # Section: Ensure positive variance on diagonal
     for ticker_idx in S_cleaned.index:
-        if S_cleaned.loc[ticker_idx, ticker_idx] <= 1e-9: # Use a small epsilon
+        if S_cleaned.loc[ticker_idx, ticker_idx] <= 1e-9:
             S_cleaned.loc[ticker_idx, ticker_idx] = 1e-9
-            # Optionally zero out off-diagonal elements for this ticker if variance was ~0
-            # for other_ticker_idx in S_cleaned.columns:
-            #     if ticker_idx != other_ticker_idx:
-            #         S_cleaned.loc[ticker_idx, other_ticker_idx] = 0.0
-            #         S_cleaned.loc[other_ticker_idx, ticker_idx] = 0.0
 
-
+    # Section: Final validation before optimization
     if mu_cleaned.empty or S_cleaned.empty or S_cleaned.shape[0] != S_cleaned.shape[1] or len(mu_cleaned) != len(S_cleaned):
         current_logger.error(f"mu_cleaned (len {len(mu_cleaned)}) or S_cleaned (shape {S_cleaned.shape}) "
                              f"is empty or mismatched after cleaning. Cannot optimize.")
-        # Fallback to equal weights based on available tickers in mu_cleaned
         num_assets_fallback = len(mu_cleaned.index)
         if num_assets_fallback > 0:
             return {ticker: 1.0 / num_assets_fallback for ticker in mu_cleaned.index}
@@ -76,10 +72,10 @@ def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame, logger_instance
         
     current_logger.debug(f"Optimizing Markowitz for {len(mu_cleaned)} assets. Weight bounds: {configs.MARKOWITZ_WEIGHT_BOUNDS}")
 
+    # Section: Markowitz optimization
     try:
         ef = EfficientFrontier(mu_cleaned, S_cleaned, weight_bounds=configs.MARKOWITZ_WEIGHT_BOUNDS)
         
-        # Optional L2 regularization
         if hasattr(configs, 'MARKOWITZ_L2_REG_GAMMA') and configs.MARKOWITZ_L2_REG_GAMMA > 0:
             ef.add_objective(objective_functions.L2_reg, gamma=configs.MARKOWITZ_L2_REG_GAMMA)
             current_logger.debug(f"Added L2 regularization with gamma={configs.MARKOWITZ_L2_REG_GAMMA}")
@@ -89,8 +85,6 @@ def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame, logger_instance
             weights = ef.max_sharpe(risk_free_rate=configs.MARKOWITZ_RISK_FREE_RATE)
         elif objective_choice == 'min_volatility':
             weights = ef.min_volatility()
-        # Add other objectives like efficient_risk or efficient_return if needed,
-        # checking for corresponding target_volatility/target_return in configs
         else:
             current_logger.warning(f"Markowitz objective '{configs.MARKOWITZ_OBJECTIVE}' not recognized or fully specified. Defaulting to 'max_sharpe'.")
             weights = ef.max_sharpe(risk_free_rate=configs.MARKOWITZ_RISK_FREE_RATE)
@@ -101,6 +95,7 @@ def optimize_markowitz_portfolio(mu: pd.Series, S: pd.DataFrame, logger_instance
         current_logger.debug(f"Optimized Markowitz weights: {cleaned_weights}")
         return cleaned_weights
 
+    # Section: Exception handling and fallback
     except Exception as e:
         current_logger.error(f"Error during Markowitz optimization with PyPortfolioOpt: {e}", exc_info=True)
         current_logger.debug(f"Mu values at time of error for Markowitz: {mu_cleaned.to_dict()}")

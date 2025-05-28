@@ -1,4 +1,5 @@
 # /.ndmh/marketml/utils/metrics.py
+
 import pandas as pd
 import numpy as np
 from sklearn.metrics import (
@@ -38,21 +39,17 @@ def calculate_classification_metrics(y_true, y_pred, model_name="Model", logger:
 
         if len(y_true_arr) == 0 or len(y_pred_arr) == 0 :
             current_logger.warning(f"  {model_name}: Empty true labels or predictions. Cannot calculate metrics.")
-            return results # Return NaNs
+            return results
 
         if len(y_true_arr) != len(y_pred_arr):
             current_logger.warning(f"  {model_name}: Length mismatch between y_true ({len(y_true_arr)}) and y_pred ({len(y_pred_arr)}). Cannot calculate metrics.")
-            return results # Return NaNs
+            return results
 
         accuracy = accuracy_score(y_true_arr, y_pred_arr)
         
-        # Ensure all unique labels in y_true and y_pred are present for target_names
-        # Classes for -1, 0, 1 are 'Decrease (-1)', 'No Change (0)', 'Increase (1)'
-        # Determine unique labels present in either y_true or y_pred that are in {-1, 0, 1}
+        # Section: Prepare labels and target names for report
         present_labels = sorted(list(set(y_true_arr) | set(y_pred_arr)))
         target_names_map = {-1: 'Decrease (-1)', 0: 'No Change (0)', 1: 'Increase (1)'}
-        
-        # Filter labels for report to only those actually present and in our map
         report_labels_numeric = [l for l in present_labels if l in target_names_map]
         report_target_names = [target_names_map[l] for l in report_labels_numeric]
         
@@ -79,3 +76,4 @@ def calculate_classification_metrics(y_true, y_pred, model_name="Model", logger:
         current_logger.error(f"  General error calculating metrics for {model_name}: {e}", exc_info=True)
     
     return results
+    

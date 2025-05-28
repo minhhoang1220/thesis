@@ -1,19 +1,17 @@
 # marketml/portfolio_opt/backtesting.py
+
 import pandas as pd
 import numpy as np
 import quantstats as qs
 import logging
-# from pathlib import Path # Không cần nếu sys.path bị xóa
-# import sys # XÓA DÒNG NÀY
 
 try:
     from marketml.configs import configs
 except ImportError:
-    # Ghi log lỗi ban đầu ra stdout nếu logger chưa kịp thiết lập
     print("CRITICAL ERROR in backtesting.py: Could not import 'marketml.configs'. Ensure it's accessible.")
-    raise # Re-raise để dừng hẳn
+    raise
 
-logger = logging.getLogger(__name__) # Lấy logger cục bộ cho module này
+logger = logging.getLogger(__name__)
 
 class PortfolioBacktester:
     """
@@ -32,14 +30,13 @@ class PortfolioBacktester:
             raise ValueError("Initial capital must be positive.")
 
         self.initial_capital = initial_capital
-        self.transaction_cost_pct = transaction_cost_bps / 10000.0 # Convert bps to percentage
-        self.portfolio_history = [] # Stores dicts of portfolio state at each rebalance/evaluation point
+        self.transaction_cost_pct = transaction_cost_bps / 10000.0
+        self.portfolio_history = []
         self.cash = initial_capital
-        self.current_holdings = {} # Stores {ticker: number_of_shares}
+        self.current_holdings = {}
         logger.info(f"PortfolioBacktester initialized with Initial Capital: {self.initial_capital:.2f}, Tx Cost: {transaction_cost_bps} bps")
 
     def _calculate_transaction_costs(self, trades_value: float) -> float:
-        """Calculates transaction costs based on the total value of trades."""
         return trades_value * self.transaction_cost_pct
 
     def rebalance(self, date: pd.Timestamp, new_weights: dict, current_prices: pd.Series):
@@ -54,7 +51,7 @@ class PortfolioBacktester:
         logger.info(f"Attempting rebalance on {date.date()} with target weights sum: {sum(new_weights.values()):.4f}")
         logger.debug(f"Target weights for rebalance: {new_weights}")
 
-        # 1. Calculate current portfolio value before rebalancing
+        # Section: Calculate current portfolio value before rebalancing
         current_value_of_held_assets = 0
         for ticker_held, shares_held in self.current_holdings.items():
             asset_price = current_prices.get(ticker_held)
@@ -68,11 +65,11 @@ class PortfolioBacktester:
         logger.debug(f"Portfolio value BEFORE rebalance on {date.date()}: {portfolio_value_before_rebalance:.2f} "
                      f"(Cash: {self.cash:.2f}, Assets: {current_value_of_held_assets:.2f})")
 
-        if portfolio_value_before_rebalance <= 1e-6: # Effectively zero or negative
-            if not self.portfolio_history: # First rebalance and broke
+        if portfolio_value_before_rebalance <= 1e-6:
+            if not self.portfolio_history:
                 logger.warning(f"Portfolio value before rebalance is {portfolio_value_before_rebalance:.2f} on {date.date()}. "
                                f"Resetting to initial capital for allocation attempt if it's the first operation.")
-                portfolio_value_before_rebalance = self.initial_capital # Try to allocate from scratch
+                portfolio_value_before_rebalance = self.initial_capital
                 self.cash = self.initial_capital
                 self.current_holdings = {}
             else:
@@ -81,11 +78,11 @@ class PortfolioBacktester:
                 if self.portfolio_history:
                     last_entry = self.portfolio_history[-1].copy()
                     last_entry['date'] = date
-                    last_entry['returns'] = 0.0 # No change if cannot rebalance
+                    last_entry['returns'] = 0.0
                     self.portfolio_history.append(last_entry)
                 return
 
-        # 2. Filter new_weights for valid tickers with positive prices
+        # Section: Filter new_weights for valid tickers with positive prices
         valid_target_weights = {
             ticker: weight for ticker, weight in new_weights.items()
             if ticker in current_prices.index and pd.notna(current_prices[ticker]) and current_prices[ticker] > 0
@@ -105,22 +102,12 @@ class PortfolioBacktester:
             })
             return
         
-        # Normalize valid_target_weights if their sum is not 1 (e.g. due to filtering)
         sum_valid_weights = sum(valid_target_weights.values())
-        if abs(sum_valid_weights - 1.0) > 1e-6 and sum_valid_weights > 1e-6 : # If sum is not 1 and not zero
+        if abs(sum_valid_weights - 1.0) > 1e-6 and sum_valid_weights > 1e-6:
             logger.debug(f"Normalizing valid target weights from sum {sum_valid_weights:.4f} to 1.0")
             valid_target_weights = {t: w / sum_valid_weights for t, w in valid_target_weights.items()}
 
-
-        # 3. Calculate target dollar values and shares for valid tickers
-        target_shares = {}
-        # Value available for assets is (1 - target cash weight) * portfolio_value_before_rebalance
-        # Assuming new_weights dict includes cash implicitly or explicitly as (1 - sum of asset weights)
-        # For PyPortfolioOpt, weights usually sum to 1 for assets.
-        # If a cash weight is desired, it should be handled by the strategy providing new_weights.
-        # Here, we assume new_weights are for assets and sum to 1 (or are normalized to sum to 1).
-        
-        # Iterate to calculate trades and costs
+        # Section: Calculate target dollar values and shares for valid tickers
         current_asset_dollar_values_before_trade = {
             ticker: shares * current_prices.get(ticker, 0)
             for ticker, shares in self.current_holdings.items()
@@ -141,28 +128,27 @@ class PortfolioBacktester:
         total_transaction_costs = self._calculate_transaction_costs(trades_value_total)
         logger.debug(f"Total value of trades: {trades_value_total:.2f}, Transaction costs for rebalance on {date.date()}: {total_transaction_costs:.2f}")
 
-        # Portfolio value after transaction costs, before allocating to new weights
         portfolio_value_for_new_allocation = portfolio_value_before_rebalance - total_transaction_costs
 
-        # 5. Update cash and holdings
-        new_cash = portfolio_value_for_new_allocation # Start with all cash after costs
+        # Section: Update cash and holdings
+        new_cash = portfolio_value_for_new_allocation
         new_holdings_shares = {}
 
         for ticker, target_weight in valid_target_weights.items():
             dollar_amount_for_ticker = portfolio_value_for_new_allocation * target_weight
             if current_prices[ticker] > 0:
                 new_holdings_shares[ticker] = dollar_amount_for_ticker / current_prices[ticker]
-                new_cash -= dollar_amount_for_ticker # Reduce cash by amount allocated to this asset
-            else: # Should have been filtered by valid_target_weights, but as a safeguard
+                new_cash -= dollar_amount_for_ticker
+            else:
                 new_holdings_shares[ticker] = 0
         
         self.cash = new_cash
         self.current_holdings = new_holdings_shares.copy()
 
-        # 6. Record history after rebalance
+        # Section: Record history after rebalance
         value_of_assets_after_rebalance = 0
         for ticker, shares in self.current_holdings.items():
-            asset_price = current_prices.get(ticker) # Prices at rebalance point
+            asset_price = current_prices.get(ticker)
             if pd.notna(asset_price) and asset_price > 0:
                 value_of_assets_after_rebalance += shares * asset_price
         
@@ -178,26 +164,20 @@ class PortfolioBacktester:
                     actual_weights_after_rebalance[ticker] = (shares * asset_price) / portfolio_value_after_rebalance_and_costs
         
         period_return = 0.0
-        if self.portfolio_history: # If not the very first operation
-            # The 'return' is calculated from the value *before this rebalance* to the value *after this rebalance*
-            # This captures the impact of this rebalance itself (costs) relative to the portfolio value just before it.
-            # Note: update_portfolio_values_daily will calculate day-over-day returns.
+        if self.portfolio_history:
             value_at_previous_point = self.portfolio_history[-1]['value']
             if value_at_previous_point > 1e-6:
                 period_return = (portfolio_value_after_rebalance_and_costs - value_at_previous_point) / value_at_previous_point
-        else: # First operation, return is vs initial capital if we consider this the first data point.
-              # Or 0 if we only care about returns *between* rebalance points.
-              # Let's make it return vs portfolio_value_before_rebalance to capture cost impact
+        else:
             if portfolio_value_before_rebalance > 1e-6:
                 period_return = (portfolio_value_after_rebalance_and_costs - portfolio_value_before_rebalance) / portfolio_value_before_rebalance
-
 
         self.portfolio_history.append({
             'date': date,
             'value': portfolio_value_after_rebalance_and_costs,
             'weights': actual_weights_after_rebalance,
             'cash': self.cash,
-            'returns': period_return # This specific return reflects the rebalance event
+            'returns': period_return
         })
 
     def get_portfolio_performance_df(self) -> pd.DataFrame:
@@ -207,7 +187,7 @@ class PortfolioBacktester:
             return pd.DataFrame()
         df = pd.DataFrame(self.portfolio_history)
         df['date'] = pd.to_datetime(df['date'])
-        df = df.set_index('date').sort_index() # Ensure sorted by date
+        df = df.set_index('date').sort_index()
         return df
 
     def calculate_metrics(self, portfolio_returns_series: pd.Series, benchmark_returns: pd.Series = None, logger_instance: logging.Logger = None) -> pd.Series:
@@ -224,7 +204,7 @@ class PortfolioBacktester:
         """
         current_logger = logger_instance if logger_instance else logger
         
-        # Input validation
+        # Section: Input validation
         if portfolio_returns_series is None:
             current_logger.error("Portfolio returns series is None. Cannot calculate metrics.")
             return pd.Series(dtype=float)
@@ -237,7 +217,7 @@ class PortfolioBacktester:
             current_logger.error("Portfolio returns series is empty. Cannot calculate metrics.")
             return pd.Series(dtype=float)
         
-        # Data preprocessing
+        # Section: Data preprocessing
         try:
             processed_returns = portfolio_returns_series.astype(float).fillna(0.0)
         except Exception as e:
@@ -251,7 +231,7 @@ class PortfolioBacktester:
         current_logger.info("Calculating performance metrics using QuantStats...")
         qs.extend_pandas()
         
-        # Calculate base metrics
+        # Section: Calculate base metrics
         try:
             metrics_dict = {
                 'Cumulative Return': qs.stats.comp(processed_returns) * 100,
@@ -270,7 +250,7 @@ class PortfolioBacktester:
             current_logger.error(f"Error calculating base metrics: {e_metrics}", exc_info=True)
             return pd.Series(dtype=float)
         
-        # Calculate benchmark-related metrics if benchmark provided
+        # Section: Calculate benchmark-related metrics if benchmark provided
         if benchmark_returns is not None:
             try:
                 if not isinstance(benchmark_returns, pd.Series):

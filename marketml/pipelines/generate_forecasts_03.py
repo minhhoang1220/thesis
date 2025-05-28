@@ -8,10 +8,10 @@ import warnings
 import pmdarima as pm
 from statsmodels.tsa.stattools import adfuller
 
-# ===== Import các module từ marketml và configs =====
+# ===== Import modules from marketml and configs =====
 try:
     from marketml.configs import configs
-    from marketml.utils import logger_setup # Import logger setup
+    from marketml.utils import logger_setup
 except ModuleNotFoundError as e:
     print(f"CRITICAL ERROR in 03_generate_forecasts.py: Could not import necessary marketml modules. {e}")
     print("Ensure the marketml package is installed correctly or PYTHONPATH is set.")
@@ -29,7 +29,7 @@ def generate_forecasts_for_year(forecast_year: int, training_years: int):
     logger.info(f"--- Generating Forecast for Year {forecast_year} using last {training_years} years of data ---")
 
     # --- Step 1: Load Enriched Data ---
-    enriched_data_file = configs.ENRICHED_DATA_FOR_FORECAST # Sử dụng trực tiếp từ configs
+    enriched_data_file = configs.ENRICHED_DATA_FOR_FORECAST
     logger.info(f"Attempting to load enriched data from: {enriched_data_file.resolve()}")
     try:
         df_hist = pd.read_csv(enriched_data_file, parse_dates=['date'])
@@ -56,7 +56,7 @@ def generate_forecasts_for_year(forecast_year: int, training_years: int):
         return None
 
     training_end_date = last_hist_date
-    training_start_date = training_end_date - pd.Timedelta(days=365 * training_years) # pd.Timedelta đã được import
+    training_start_date = training_end_date - pd.Timedelta(days=365 * training_years)
     
     logger.info(f"Final training period defined: {training_start_date.date()} to {training_end_date.date()}")
     final_train_df = df_hist[(df_hist['date'] >= training_start_date) & (df_hist['date'] <= training_end_date)].copy()
@@ -66,9 +66,8 @@ def generate_forecasts_for_year(forecast_year: int, training_years: int):
         return None
 
     # --- Step 3: Estimate Forecast Periods and Future Dates ---
-    # APPROX_TRADING_DAYS_PER_YEAR and TREND_THRESHOLD from configs
     forecast_start_date = last_hist_date + pd.Timedelta(days=1)
-    forecast_end_date = pd.Timestamp(f"{forecast_year}-12-31") # pd.Timestamp
+    forecast_end_date = pd.Timestamp(f"{forecast_year}-12-31")
 
     if forecast_start_date > forecast_end_date:
         logger.error(f"Forecast start date ({forecast_start_date.date()}) is after forecast end date ({forecast_end_date.date()}). Cannot generate forecasts.")
@@ -89,44 +88,38 @@ def generate_forecasts_for_year(forecast_year: int, training_years: int):
 
     for ticker in unique_tickers:
         logger.info(f"  Processing forecast for ticker: {ticker}")
-        ticker_train_data = final_train_df[final_train_df['ticker'] == ticker].copy() # Use .copy()
+        ticker_train_data = final_train_df[final_train_df['ticker'] == ticker].copy()
         
-        # Ensure 'close' column exists and is numeric
         if 'close' not in ticker_train_data.columns or not pd.api.types.is_numeric_dtype(ticker_train_data['close']):
             logger.warning(f"    Skipping {ticker}: 'close' column missing or not numeric.")
             continue
 
         y_train_pct_change = ticker_train_data['close'].pct_change().dropna()
 
-        if y_train_pct_change.empty or len(y_train_pct_change) < 10: # Need some data for ADF and ARIMA
+        if y_train_pct_change.empty or len(y_train_pct_change) < 10:
             logger.warning(f"    Skipping {ticker}: Not enough historical percentage change data (found {len(y_train_pct_change)}).")
             continue
         
         try:
-            # ADF test to determine 'd'
             adf_result = adfuller(y_train_pct_change)
             p_value = adf_result[1]
-            d_order = 1 if p_value > 0.05 else 0 # Simpler: d=1 if not stationary, 0 if stationary
+            d_order = 1 if p_value > 0.05 else 0
             logger.debug(f"    ADF P-value for {ticker}: {p_value:.4f}, selected d_order: {d_order}")
 
-            # AutoARIMA model fitting
-            # Consider adding error_action='warn' or 'raise' during debugging for auto_arima
             final_arima_model = pm.auto_arima(
                 y_train_pct_change,
                 d=d_order,
                 start_p=1, start_q=1, max_p=3, max_q=3,
-                seasonal=False, # Assuming non-seasonal daily pct changes for simplicity
+                seasonal=False,
                 stepwise=True,
-                suppress_warnings=True, # Suppress convergence warnings from ARIMA
-                error_action='ignore', # Skip if model cannot be fit
-                trace=False # Set to True for detailed ARIMA search steps
+                suppress_warnings=True,
+                error_action='ignore',
+                trace=False
             )
             logger.debug(f"    AutoARIMA model for {ticker}: {final_arima_model.summary().tables[0].as_text()}")
 
-
             forecast_pct_change_values = final_arima_model.predict(n_periods=n_periods_forecast)
             
-            # Determine trend based on threshold from configs
             forecast_trend_values = np.select(
                 [(forecast_pct_change_values > configs.FORECAST_TREND_THRESHOLD),
                  (forecast_pct_change_values < -configs.FORECAST_TREND_THRESHOLD)],
@@ -143,7 +136,7 @@ def generate_forecasts_for_year(forecast_year: int, training_years: int):
             logger.info(f"    Successfully generated forecast for {ticker}.")
 
         except Exception as e:
-            logger.error(f"    Error processing ARIMA forecast for {ticker}: {e}", exc_info=False) # exc_info=False to avoid long tracebacks for common errors
+            logger.error(f"    Error processing ARIMA forecast for {ticker}: {e}", exc_info=False)
 
     # --- Step 5: Combine and Save Forecast Results ---
     if not all_forecasts_list:
@@ -155,11 +148,8 @@ def generate_forecasts_for_year(forecast_year: int, training_years: int):
     logger.debug(f"Sample of final forecast (last 5 rows):\n{final_forecast_df.tail().to_string()}")
 
     try:
-        # Output directory from configs
         forecast_output_dir = configs.FORECASTS_OUTPUT_DIR
         forecast_output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Filename can be made more specific if needed (e.g., include model name)
         forecast_file_path = forecast_output_dir / f"arima_forecast_{forecast_year}.csv"
         final_forecast_df.to_csv(forecast_file_path, index=False)
         logger.info(f"Forecasts saved to: {forecast_file_path.resolve()}")
@@ -174,7 +164,6 @@ def main():
     """
     logger.info("Starting: 03_generate_forecasts pipeline")
     
-    # Parameters from configs
     forecast_target_year = configs.FORECAST_YEAR_TARGET
     forecast_training_yrs = configs.FORECAST_TRAINING_YEARS
 

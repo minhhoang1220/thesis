@@ -9,8 +9,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.utils import class_weight
 import warnings
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # 0 = all logs, 1 = filter INFO, 2 = filter INFO & WARNING, 3 = filter INFO, WARNING, & ERROR
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # Có thể giúp với một số cảnh báo CPU
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 # ===== Import modules from marketml and configs =====
 try:
@@ -60,7 +60,6 @@ try:
 except ImportError:
     logger.info("arch library not installed. If 'garch_vol_forecast' is used, it might be all NaNs.")
     ARCH_INSTALLED = False
-
 
 # ==============================================================================
 # FUNCTION TO CREATE ROLLING/EXPANDING WINDOWS
@@ -121,7 +120,6 @@ def prepare_split_data(train_df_orig, test_df_orig, feature_cols, lag_periods,
     prepared_data = {'data_valid': False}
 
     try:
-        # ---- Create Target ----
         for df_split in [train_df, test_df]:
             df_split[target_col_pct] = df_split.groupby('ticker')['close'].pct_change().shift(-1)
             conditions = [
@@ -131,13 +129,11 @@ def prepare_split_data(train_df_orig, test_df_orig, feature_cols, lag_periods,
             choices = [1, -1]
             df_split[target_col_trend] = np.select(conditions, choices, default=0)
 
-        # ---- Create Lags ----
         for df_split in [train_df, test_df]:
             pct_change_series = df_split.groupby('ticker')['close'].pct_change()
             for p in lag_periods:
                 df_split[f'pct_change_lag_{p}'] = pct_change_series.groupby(df_split['ticker']).shift(p)
 
-        # ---- Impute & Align for ML ----
         X_train_raw = train_df[feature_cols].copy()
         X_test_raw = test_df[feature_cols].copy()
         y_train_trend_ml = train_df[target_col_trend]
@@ -172,7 +168,6 @@ def prepare_split_data(train_df_orig, test_df_orig, feature_cols, lag_periods,
 
         prepared_data['y_test_ml'] = y_test_ml_aligned.values
 
-        # ---- Scaling for ML ----
         scaler = StandardScaler()
         X_train_scaled_np = scaler.fit_transform(X_train_ml)
         X_test_scaled_np = scaler.transform(X_test_ml)
@@ -182,8 +177,6 @@ def prepare_split_data(train_df_orig, test_df_orig, feature_cols, lag_periods,
         prepared_data['X_test_scaled'] = X_test_scaled_np
         prepared_data['feature_names'] = X_train_ml.columns.tolist()
 
-        # ---- Prepare for Keras (LSTM, Transformer) ----
-        # Target for Keras: 0 (Down), 1 (Neutral), 2 (Up)
         y_train_keras = y_train_ml_aligned.replace({-1: 0, 0: 1, 1: 2}).values
         y_test_keras_for_seq_target = y_test_ml_aligned.replace({-1: 0, 0: 1, 1: 2}).values
 
@@ -192,7 +185,6 @@ def prepare_split_data(train_df_orig, test_df_orig, feature_cols, lag_periods,
         X_train_seq, y_train_seq = keras_utils.create_sequences(X_train_scaled_np, y_train_keras, n_timesteps)
         X_test_seq, _ = keras_utils.create_sequences(X_test_scaled_np, None, n_timesteps)
 
-        # y_test_seq_original_trend: original trend values (-1,0,1) corresponding to X_test_seq
         if len(y_test_ml_aligned) >= n_timesteps and X_test_seq.shape[0] > 0:
             prepared_data['y_test_seq_original_trend'] = y_test_ml_aligned.iloc[n_timesteps -1 :].values[:len(X_test_seq)]
         else:
@@ -239,7 +231,6 @@ def prepare_split_data(train_df_orig, test_df_orig, feature_cols, lag_periods,
 def main():
     logger.info("Starting: 02_train_forecasting_models pipeline")
 
-    # --- Step 1: Load Enriched Data ---
     try:
         logger.info(f"Loading enriched data from: {configs.ENRICHED_DATA_FILE}")
         df_with_indicators = pd.read_csv(configs.ENRICHED_DATA_FILE, parse_dates=['date'])
@@ -252,7 +243,6 @@ def main():
         logger.error(f"CRITICAL: Error loading enriched data: {e}. Exiting.", exc_info=True)
         return
 
-    # --- Quick Sanity Checks ---
     required_cols_check = ['date', 'ticker', 'close'] + configs.BASE_FEATURE_COLS[:2]
     missing_cols = []
     for col in required_cols_check:
@@ -275,7 +265,6 @@ def main():
         return
 
     logger.info("Starting Cross-Validation Runs for forecasting models...")
-    # --- Get parameters from configs ---
     initial_train_td = configs.INITIAL_TRAIN_TIMEDELTA
     test_td = configs.TEST_TIMEDELTA
     step_td = configs.STEP_TIMEDELTA
@@ -328,14 +317,12 @@ def main():
         logger.info(f"===== Processing CV Split {split_idx} =====")
         results_this_split = {}
 
-        # Prepare data for this specific split
         prep_data = prepare_split_data(
             train_df_orig, test_df_orig, feature_cols_for_ml, lag_periods,
             target_col_pct, target_col_trend, trend_threshold, n_timesteps_sequence
         )
 
         if prep_data.get('data_valid', False):
-            # ARIMA Model
             logger.info("  Running ARIMA model evaluation...")
             arima_results = arima_model.run_arima_evaluation(
                 prep_data['train_df_with_target_for_arima'],
@@ -346,11 +333,6 @@ def main():
             )
             results_this_split.update(arima_results)
             
-            # Placeholder for GARCH (if you decide to implement it as a forecasting model)
-            # For now, it's just a feature.
-            # results_this_split.update({"GARCH_Accuracy": np.nan, ...})
-
-            # RandomForest Model
             if SKLEARN_INSTALLED:
                 logger.info("  Running RandomForest model evaluation...")
                 rf_results = rf_model.run_rf_evaluation(
@@ -362,7 +344,6 @@ def main():
                 )
                 results_this_split.update(rf_results)
 
-            # XGBoost Model
             if XGB_INSTALLED:
                 logger.info("  Running XGBoost model evaluation...")
                 xgb_results = xgboost_model.run_xgboost_evaluation(
@@ -374,7 +355,6 @@ def main():
                 )
                 results_this_split.update(xgb_results)
             
-            # SVM Model
             if SKLEARN_INSTALLED:
                 logger.info("  Running SVM model evaluation...")
                 svm_results = svm_model.run_svm_evaluation(
@@ -386,17 +366,14 @@ def main():
                 )
                 results_this_split.update(svm_results)
             
-            # Determine number of features for sequence models
             if prep_data['X_train_scaled'].ndim == 2:
                 current_n_features_for_seq = prep_data['X_train_scaled'].shape[1]
-            elif prep_data['X_train_seq'].ndim == 3: # Should be from X_train_seq
+            elif prep_data['X_train_seq'].ndim == 3:
                 current_n_features_for_seq = prep_data['X_train_seq'].shape[2]
             else:
                 logger.error("  Could not determine number of features for sequence models. Skipping LSTM/Transformer.")
                 current_n_features_for_seq = 0
 
-
-            # LSTM Model
             if TF_INSTALLED and prep_data['X_train_seq'].shape[0] > 0 and current_n_features_for_seq > 0:
                 logger.info("  Running LSTM model evaluation...")
                 lstm_results = lstm_model.run_lstm_evaluation(
@@ -411,8 +388,6 @@ def main():
             elif TF_INSTALLED:
                 logger.warning("  Skipping LSTM for this split: No valid sequence data or features.")
 
-
-            # Transformer Model
             if TF_INSTALLED and prep_data['X_train_seq'].shape[0] > 0 and current_n_features_for_seq > 0:
                 logger.info("  Running Transformer model evaluation...")
                 transformer_results = transformer_model.run_transformer_evaluation(
@@ -427,10 +402,9 @@ def main():
             elif TF_INSTALLED:
                 logger.warning("  Skipping Transformer for this split: No valid sequence data or features.")
 
-        else: # prep_data was not valid
+        else:
             logger.warning(f"Skipping model evaluation for Split {split_idx} due to invalid prepared data.")
-            # Assign NaNs to all potential model metrics for this split
-            model_names_for_nan = ["ARIMA", "RandomForest", "XGBoost", "SVM", "LSTM", "Transformer"] # Add GARCH if it becomes a model
+            model_names_for_nan = ["ARIMA", "RandomForest", "XGBoost", "SVM", "LSTM", "Transformer"]
             metric_suffixes_for_nan = ["Accuracy", "F1_Macro", "F1_Weighted", "Precision_Macro", "Recall_Macro"]
             for model_name_nan in model_names_for_nan:
                 for metric_suffix_nan in metric_suffixes_for_nan:
@@ -438,9 +412,6 @@ def main():
 
         all_split_results[split_idx] = results_this_split
         logger.info(f"===== Finished CV Split {split_idx} =====")
-        # if split_idx >= 0: # For quick testing of one split
-        #     logger.info("Stopping after one split for testing purposes.")
-        #     break
 
     # --- Step 5: Aggregate and Save Results ---
     logger.info("===== Aggregating Results Across All CV Splits =====")
@@ -449,22 +420,20 @@ def main():
         return
 
     final_results_df = pd.DataFrame.from_dict(all_split_results, orient='index')
-    final_results_df.dropna(axis=1, how='all', inplace=True) # Remove columns that are all NaN
+    final_results_df.dropna(axis=1, how='all', inplace=True)
 
     if final_results_df.empty:
         logger.warning("Final results DataFrame is empty after dropping all-NaN columns. Nothing to save or summarize.")
         return
 
-    # Save detailed results per split
     try:
-        configs.RESULTS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True) # Use new output dir from configs
-        detailed_results_file_path = configs.MODEL_PERF_DETAILED_FILE # Use path from configs
+        configs.RESULTS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        detailed_results_file_path = configs.MODEL_PERF_DETAILED_FILE
         final_results_df.to_csv(detailed_results_file_path)
         logger.info(f"Detailed results per CV split saved to: {detailed_results_file_path.resolve()}")
     except Exception as e:
         logger.error(f"Error saving detailed results to CSV: {e}", exc_info=True)
 
-    # Calculate and save summary (mean, std)
     logger.info("--- Performance Summary (Mean +/- Std Dev across CV Splits) ---")
     numeric_metric_cols = [col for col in final_results_df.columns if any(m_name in col for m_name in ["Accuracy", "F1", "Precision", "Recall"])]
 
@@ -472,20 +441,18 @@ def main():
         logger.warning("No numeric metric columns found in aggregated results to create a summary.")
     else:
         summary_stats = final_results_df[numeric_metric_cols].agg(['mean', 'std']).T
-        summary_stats_valid = summary_stats.dropna(subset=['mean']).copy() # Only rows with valid mean
+        summary_stats_valid = summary_stats.dropna(subset=['mean']).copy()
 
         if not summary_stats_valid.empty:
-            # For display purposes in log
             summary_display = summary_stats_valid.copy()
             summary_display['Mean +/- Std'] = summary_display.apply(
                 lambda x: f"{x['mean']:.4f} +/- {x['std']:.4f}" if pd.notna(x['std']) else f"{x['mean']:.4f}", axis=1
             )
             logger.info(f"\n{summary_display[['Mean +/- Std']].to_string()}")
 
-            # Save summary to CSV
             try:
-                summary_file_path = configs.MODEL_PERF_SUMMARY_FILE # Use path from configs
-                summary_stats_valid.to_csv(summary_file_path) # Save the DataFrame with mean and std columns
+                summary_file_path = configs.MODEL_PERF_SUMMARY_FILE
+                summary_stats_valid.to_csv(summary_file_path)
                 logger.info(f"Performance summary (mean, std) saved to: {summary_file_path.resolve()}")
             except Exception as e:
                 logger.error(f"Error saving performance summary to CSV: {e}", exc_info=True)
@@ -495,6 +462,4 @@ def main():
     logger.info("Finished: 02_train_forecasting_models pipeline")
 
 if __name__ == "__main__":
-    # This allows running the script directly, e.g., python -m marketml.pipelines.02_train_forecasting_models
-    # Ensure that when running this way, the .ndmh directory is in PYTHONPATH or you are in .ndmh/
     main()

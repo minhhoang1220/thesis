@@ -15,12 +15,11 @@ try:
         plot_annualized_return_vs_volatility,
         plot_rolling_sharpe_ratio
     )
-    # Thêm import plotly visualizer từ code mới
     from marketml.analysis import plot_utils as plotly_visualizer
 except ImportError as e:
     print(f"CRITICAL ERROR in analyze_model_performance.py: {e}")
     
-    # Fallback configuration (giữ nguyên từ code cũ)
+    # Fallback configuration
     class FallbackConfigs:
         RESULTS_OUTPUT_DIR = Path(__file__).resolve().parents[2] / "results_output"
         MODEL_PERF_SUMMARY_FILE = RESULTS_OUTPUT_DIR / "model_performance_summary.csv"
@@ -30,12 +29,12 @@ except ImportError as e:
     
     configs = FallbackConfigs()
     
-    # Fallback logger setup (giữ nguyên từ code cũ)
+    # Fallback logger setup
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger("analyzer_fallback")
     logger.warning("Using fallback configs and logger for analyze_model_performance.py")
 
-    # Thêm DummyPlotter từ code mới
+    # DummyPlotter from new code
     class DummyPlotter:
         def __getattr__(self, name):
             def _missing_plot(*args, **kwargs):
@@ -43,16 +42,16 @@ except ImportError as e:
             return _missing_plot
     plotly_visualizer = DummyPlotter()
 
-# Initialize logger if not already set up (giữ nguyên từ code cũ)
+# Initialize logger if not already set up
 if 'logger' not in locals():
     logger = logger_setup.setup_basic_logging(log_file_name="analyze_model_performance.log") if 'logger_setup' in globals() else logging.getLogger(__name__)
 
-# Configuration paths (giữ nguyên từ code cũ)
+# Path configuration
 SUMMARY_FILE_PATH = configs.MODEL_PERF_SUMMARY_FILE
 DETAILED_FILE_PATH = configs.MODEL_PERF_DETAILED_FILE
 PLOTS_SAVE_DIR = configs.RESULTS_OUTPUT_DIR / "performance_plots"
 
-# Analysis constants (giữ nguyên từ code cũ)
+# Section: Analysis constants
 METRICS_SUFFIXES_TO_PLOT = getattr(configs, 'ANALYSIS_METRICS_SUFFIXES', [
     "_Accuracy", "_F1_Macro", "_F1_Weighted", "_Precision_Macro", "_Recall_Macro"
 ])
@@ -68,7 +67,6 @@ PORTFOLIO_METRICS = getattr(configs, 'PORTFOLIO_KEY_METRICS', [
 ROLLING_WINDOWS = getattr(configs, 'ROLLING_SHARPE_WINDOWS', [30, 60, 90])
 
 def load_performance_data(file_path: Path, index_col: Optional[str] = None) -> Optional[pd.DataFrame]:
-    """Load performance data from CSV file (giữ nguyên định nghĩa từ code cũ)."""
     try:
         logger.info(f"Loading performance data from: {file_path}")
         df = pd.read_csv(file_path, index_col=index_col, parse_dates=True if index_col == 'date' else False)
@@ -83,16 +81,13 @@ def load_performance_data(file_path: Path, index_col: Optional[str] = None) -> O
     return None
 
 def analyze_forecasting_models() -> None:
-    """Analyze and visualize forecasting model performance (kết hợp cả hai phiên bản)."""
     logger.info("--- Analyzing Forecasting Model Performance ---")
     
-    # Sử dụng load_performance_data từ code cũ
     df_summary = load_performance_data(SUMMARY_FILE_PATH, index_col=0)
     if df_summary is None:
         logger.warning("No summary data available for forecasting models.")
         return
     
-    # Display summary statistics (giữ nguyên từ code cũ)
     if 'mean' in df_summary.columns and 'std' in df_summary.columns:
         df_display = df_summary.dropna(subset=['mean']).copy()
         df_display['Mean ± Std'] = df_display.apply(
@@ -100,9 +95,7 @@ def analyze_forecasting_models() -> None:
         )
         logger.info(f"\nPerformance Summary:\n{df_display[['Mean ± Std']].to_string()}")
     
-    # Thêm Plotly visualizations từ code mới
     try:
-        # Kiểm tra xem plotly_visualizer có method plot_forecasting_mean_performance không
         if hasattr(plotly_visualizer, 'plot_forecasting_mean_performance'):
             plotly_visualizer.plot_forecasting_mean_performance(
                 df_summary=df_summary,
@@ -112,7 +105,6 @@ def analyze_forecasting_models() -> None:
                 save_filename="forecasting_mean_performance_plotly.png"
             )
         
-        # Plot distribution nếu có detailed data
         if DETAILED_FILE_PATH.exists():
             df_detailed = load_performance_data(DETAILED_FILE_PATH)
             if df_detailed is not None and len(df_detailed) > 1:
@@ -133,15 +125,13 @@ def analyze_forecasting_models() -> None:
         logger.error(f"Error generating plotly forecasting plots: {e}")
 
 def analyze_portfolio_strategies() -> None:
-    """Analyze and visualize portfolio strategy performance (giữ nguyên định nghĩa từ code cũ)."""
+    """Section: Analyze and visualize portfolio strategy performance"""
     logger.info("--- Analyzing Portfolio Strategy Performance ---")
     
-    # Load strategy performance data (giữ nguyên logic từ code cũ)
     strategy_dfs = {}
     portfolio_strategies_to_analyze = getattr(configs, 'PORTFOLIO_STRATEGIES_TO_ANALYZE', ["Markowitz", "BlackLitterman"])
     rl_algo_name = getattr(configs, 'RL_ALGORITHM', "PPO").upper()
 
-    # Thêm chiến lược RL vào danh sách nếu nó được bật và có tên thuật toán
     if getattr(configs, 'RL_STRATEGY_ENABLED', False) and rl_algo_name:
         rl_dict_key = f"RL ({rl_algo_name})"
         if rl_dict_key not in portfolio_strategies_to_analyze:
@@ -151,7 +141,6 @@ def analyze_portfolio_strategies() -> None:
         "Markowitz": getattr(configs, 'MARKOWITZ_PERF_DAILY_FILE_NAME', "markowitz_performance_daily.csv"),
         "BlackLitterman": getattr(configs, 'BLACKLITTERMAN_PERF_DAILY_FILE_NAME', "blacklitterman_performance_daily.csv"),
     }
-    # Thêm mapping cho RL nếu có
     if getattr(configs, 'RL_STRATEGY_ENABLED', False) and rl_algo_name:
         rl_dict_key_for_map = f"RL ({rl_algo_name})"
         filename_map[rl_dict_key_for_map] = f"{configs.RL_ALGORITHM.lower()}_strategy_performance_daily.csv"
@@ -172,35 +161,30 @@ def analyze_portfolio_strategies() -> None:
         logger.warning("No portfolio strategy data available.")
         return
 
-    # Load summary metrics (giữ nguyên từ code cũ)
     summary_file = configs.RESULTS_OUTPUT_DIR / getattr(configs, 'PORTFOLIO_STRATEGIES_SUMMARY_FILE_NAME', "portfolio_strategies_summary.csv")
     df_summary = load_performance_data(summary_file, index_col=0)
 
-    # Generate visualizations (giữ nguyên từ code cũ)
     PLOTS_SAVE_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 1. Cumulative portfolio value
+    # Section: Portfolio plots
     plot_cumulative_portfolio_value(
         performance_dfs=strategy_dfs,
         save_dir=PLOTS_SAVE_DIR,
         title="Portfolio Value Over Time"
     )
     
-    # 2. Drawdown curves
     plot_drawdown_curves(
         performance_dfs=strategy_dfs,
         save_dir=PLOTS_SAVE_DIR,
         title="Portfolio Drawdown Analysis"
     )
     
-    # 3. Daily returns distribution
     plot_daily_returns_distribution(
         performance_dfs=strategy_dfs,
         save_dir=PLOTS_SAVE_DIR,
         title="Daily Returns Distribution"
     )
     
-    # 4. Key metrics comparison (if summary data available)
     if df_summary is not None:
         plot_key_metrics_comparison(
             summary_metrics_df=df_summary,
@@ -215,7 +199,6 @@ def analyze_portfolio_strategies() -> None:
             title="Return vs Volatility Comparison"
         )
     
-    # 5. Rolling Sharpe ratios
     risk_free_rate = getattr(configs, 'MARKOWITZ_RISK_FREE_RATE', 0.02)
     for window in ROLLING_WINDOWS:
         plot_rolling_sharpe_ratio(
@@ -226,7 +209,6 @@ def analyze_portfolio_strategies() -> None:
             title_suffix=f" ({window}-Day Window)"
         )
 
-    # Thêm plotly visualizations từ code mới (nếu có)
     try:
         if hasattr(plotly_visualizer, 'plot_cumulative_portfolio_value'):
             plotly_visualizer.plot_cumulative_portfolio_value(
@@ -243,7 +225,6 @@ def analyze_portfolio_strategies() -> None:
         if hasattr(plotly_visualizer, 'plot_daily_returns_distribution'):
             plotly_visualizer.plot_daily_returns_distribution(
                 performance_dfs=strategy_dfs, 
-                use_kde=True, 
                 save_dir=PLOTS_SAVE_DIR
             )
         
@@ -261,7 +242,6 @@ def analyze_portfolio_strategies() -> None:
                     save_dir=PLOTS_SAVE_DIR
                 )
         
-        # Rolling Sharpe với plotly
         for window in ROLLING_WINDOWS:
             if hasattr(plotly_visualizer, 'plot_rolling_sharpe_ratio'):
                 plotly_visualizer.plot_rolling_sharpe_ratio(
@@ -277,7 +257,7 @@ def analyze_portfolio_strategies() -> None:
         logger.error(f"Error generating plotly portfolio plots: {e}")
 
 def main() -> None:
-    """Main analysis workflow (giữ nguyên từ code cũ)."""
+    """Main analysis workflow"""
     logger.info("===== Starting Performance Analysis =====")
     analyze_forecasting_models()
     analyze_portfolio_strategies()
