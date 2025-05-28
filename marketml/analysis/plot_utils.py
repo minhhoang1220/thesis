@@ -631,7 +631,7 @@ def plot_key_metrics_comparison(
                  })
 
     apply_common_font_style(fig)
-    fig.update_traces(textposition='outside')
+    fig.update_traces(marker_opacity=0.8, textposition='outside')
     fig.update_layout(margin=dict(l=70, r=50, t=100, b=120),
                       legend_orientation="h", legend_yanchor="bottom", legend_y=1.02, legend_xanchor="right", legend_x=1)
 
@@ -701,7 +701,7 @@ def plot_annualized_return_vs_volatility(
     )
     
     apply_common_font_style(fig)
-    fig.update_traces(textposition='top center', textfont=dict(size=COMMON_FONT_SIZE_DATALABEL -1, family="Arial, sans-serif"))
+    fig.update_traces(textposition='top center', marker_opacity = 0.85, textfont=dict(size=COMMON_FONT_SIZE_DATALABEL -1, family="Arial, sans-serif"))
     fig.update_layout(height=height, hovermode="closest", legend_title_text="Portfolio Strategy")
 
     if not df_plot.empty:

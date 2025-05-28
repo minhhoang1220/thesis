@@ -25,6 +25,7 @@ yfinance>=0.2.12 # Nếu vẫn dùng để lấy data mới
 # Plotting & Visualization
 matplotlib>=3.4
 seaborn>=0.11
+plotly>=6.0
 
 # Utilities
 joblib # Cho lưu/tải scaler, model (nếu dùng)
