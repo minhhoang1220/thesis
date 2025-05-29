@@ -795,7 +795,7 @@ def plot_rolling_sharpe_ratio_faceted(
     title: str = "Rolling Sharpe Ratio Comparison (Faceted by Window)",
     save_filename: str = "rolling_sharpe_faceted.png",
     save_dir: Optional[Path] = None,
-    width: int = 1600, height: int = 900 # Adjusted default size for faceted plot
+    width: int = 1600, height: int = 900
 ):
     if not performance_dfs: logger.warning("No performance data for faceted rolling Sharpe."); return
     if not rolling_windows: logger.warning("No rolling windows specified for faceted rolling Sharpe."); return
@@ -803,7 +803,7 @@ def plot_rolling_sharpe_ratio_faceted(
     except ImportError: logger.error("QuantStats library not found for faceted rolling Sharpe."); return
 
     all_rolling_sharpe_data = []
-    daily_rf = risk_free_rate / 252.0 # Assuming 252 trading days per year
+    daily_rf = risk_free_rate / 252.0
     
     # Determine overall strategy order for consistent coloring and legend
     ordered_input_strategy_names_raw = list(performance_dfs.keys())
@@ -818,7 +818,7 @@ def plot_rolling_sharpe_ratio_faceted(
         actual_strategies_to_plot_ordered = unified_input_names
     actual_strategies_to_plot_ordered = sorted(list(set(actual_strategies_to_plot_ordered)), key=actual_strategies_to_plot_ordered.index)
 
-    for strategy_name_orig in ordered_input_strategy_names_raw: # Iterate through original keys to get data
+    for strategy_name_orig in ordered_input_strategy_names_raw:
         df_strat = performance_dfs.get(strategy_name_orig)
         if df_strat is None: continue
         strategy_display_name = unify_strategy_name(strategy_name_orig)
@@ -868,13 +868,13 @@ def plot_rolling_sharpe_ratio_faceted(
         facet_col="Window",
         facet_col_wrap=facet_col_wrap,
         title=title, 
-        labels={"Sharpe Ratio": "Annualized Sharpe Ratio", "Date": "Date"}, # Y-axis label for all facets
+        labels={"Sharpe Ratio": "Annualized Sharpe Ratio", "Date": "Date"},
         color_discrete_map=strategy_color_map, 
         height=height, 
         width=width,
         category_orders={"Window": ordered_windows_cat, "Strategy": actual_strategies_to_plot_ordered}
     )
-    fig.update_traces(line_width=1.5) # Slightly thinner lines for faceted plot
+    fig.update_traces(line_width=1.5)
 
     apply_common_font_style(fig)
     fig.update_layout(legend_title_text="Strategy", hovermode="x unified")

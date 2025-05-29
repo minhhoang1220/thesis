@@ -281,3 +281,195 @@ Transformer_Recall_Macro      0.3432 ± 0.0244
 2025-05-29 06:38:15,598 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/blacklitterman_performance_daily.csv
 2025-05-29 06:38:15,602 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/ppo_strategy_performance_daily.csv
 2025-05-29 06:38:15,606 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/portfolio_strategies_summary.csv
+2025-05-29 06:58:01,360 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-29 06:58:01,361 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-29 06:58:01,361 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-29 06:58:01,517 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-29 06:58:01,518 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-29 06:58:01,518 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_summary.csv
+2025-05-29 06:58:01,565 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-29 06:58:01,566 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_detailed.csv
+2025-05-29 06:58:04,495 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-29 06:58:04,495 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/markowitz_performance_daily.csv
+2025-05-29 06:58:04,503 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/blacklitterman_performance_daily.csv
+2025-05-29 06:58:04,509 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/ppo_strategy_performance_daily.csv
+2025-05-29 06:58:04,518 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/portfolio_strategies_summary.csv
+2025-05-29 06:58:18,076 - marketml_project - INFO - ===== Analysis Completed =====
+2025-05-29 06:58:18,077 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-29 06:58:18,078 - marketml_project - INFO - Pipeline finished.
+2025-05-29 06:59:04,522 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-29 06:59:04,523 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-29 06:59:04,523 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-29 06:59:04,677 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-29 06:59:04,678 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-29 06:59:04,678 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_summary.csv
+2025-05-29 06:59:04,706 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-29 06:59:04,707 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_detailed.csv
+2025-05-29 06:59:06,712 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-29 06:59:06,712 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/markowitz_performance_daily.csv
+2025-05-29 06:59:06,718 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/blacklitterman_performance_daily.csv
+2025-05-29 06:59:06,722 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/ppo_strategy_performance_daily.csv
+2025-05-29 06:59:06,727 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/portfolio_strategies_summary.csv
+2025-05-29 06:59:18,166 - marketml_project - INFO - ===== Analysis Completed =====
+2025-05-29 06:59:18,167 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-29 06:59:18,167 - marketml_project - INFO - Pipeline finished.
+2025-05-29 07:10:12,752 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-29 07:10:12,754 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-29 07:10:12,754 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-29 07:10:12,901 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-29 07:10:12,901 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-29 07:10:12,901 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_summary.csv
+2025-05-29 07:10:12,908 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-29 07:10:12,908 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_detailed.csv
+2025-05-29 07:10:14,982 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-29 07:10:14,983 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/markowitz_performance_daily.csv
+2025-05-29 07:10:14,991 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/blacklitterman_performance_daily.csv
+2025-05-29 07:10:14,996 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/ppo_strategy_performance_daily.csv
+2025-05-29 07:10:15,001 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/portfolio_strategies_summary.csv
+2025-05-29 07:11:29,475 - marketml_project - INFO - ===== Analysis Completed =====
+2025-05-29 07:11:29,478 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-29 07:11:29,478 - marketml_project - INFO - Pipeline finished.
+2025-05-29 07:12:40,326 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-05-29 07:12:40,327 - marketml_project - INFO - Pipeline starting with stages: analyze_performance
+2025-05-29 07:12:40,327 - marketml_project - INFO - Attempting to run stage: analyze_performance
+2025-05-29 07:12:40,457 - marketml_project - INFO - ===== Starting Performance Analysis =====
+2025-05-29 07:12:40,457 - marketml_project - INFO - --- Analyzing Forecasting Model Performance ---
+2025-05-29 07:12:40,458 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_summary.csv
+2025-05-29 07:12:40,469 - marketml_project - INFO - 
+Performance Summary:
+                                   Mean ± Std
+ARIMA_Accuracy                0.1995 ± 0.0511
+ARIMA_F1_Macro                0.1673 ± 0.0474
+ARIMA_F1_Weighted             0.1581 ± 0.0647
+ARIMA_Precision_Macro         0.3565 ± 0.0379
+ARIMA_Recall_Macro            0.3544 ± 0.0095
+RandomForest_Accuracy         0.4038 ± 0.0192
+RandomForest_F1_Macro         0.3515 ± 0.0085
+RandomForest_F1_Weighted      0.4087 ± 0.0152
+RandomForest_Precision_Macro  0.3537 ± 0.0088
+RandomForest_Recall_Macro     0.3601 ± 0.0129
+XGBoost_Accuracy              0.4516 ± 0.0073
+XGBoost_F1_Macro              0.3188 ± 0.0036
+XGBoost_F1_Weighted           0.4217 ± 0.0046
+XGBoost_Precision_Macro       0.3468 ± 0.0441
+XGBoost_Recall_Macro          0.3407 ± 0.0024
+SVM_Accuracy                  0.3146 ± 0.0556
+SVM_F1_Macro                  0.3041 ± 0.0404
+SVM_F1_Weighted               0.3304 ± 0.0625
+SVM_Precision_Macro           0.3641 ± 0.0105
+SVM_Recall_Macro              0.3816 ± 0.0191
+LSTM_Accuracy                 0.2967 ± 0.0145
+LSTM_F1_Macro                 0.2879 ± 0.0031
+LSTM_F1_Weighted              0.3184 ± 0.0241
+LSTM_Precision_Macro          0.3468 ± 0.0187
+LSTM_Recall_Macro             0.3569 ± 0.0282
+Transformer_Accuracy          0.3090 ± 0.0181
+Transformer_F1_Macro          0.2956 ± 0.0116
+Transformer_F1_Weighted       0.3337 ± 0.0229
+Transformer_Precision_Macro   0.3350 ± 0.0118
+Transformer_Recall_Macro      0.3432 ± 0.0244
+2025-05-29 07:12:40,469 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_detailed.csv
+2025-05-29 07:12:42,986 - marketml_project - INFO - --- Analyzing Portfolio Strategy Performance ---
+2025-05-29 07:12:42,987 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/markowitz_performance_daily.csv
+2025-05-29 07:12:42,995 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/blacklitterman_performance_daily.csv
+2025-05-29 07:12:43,000 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/ppo_strategy_performance_daily.csv
+2025-05-29 07:12:43,005 - marketml_project - INFO - Loading performance data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/portfolio_strategies_summary.csv
+2025-05-29 07:12:53,974 - marketml_project - INFO - ===== Analysis Completed =====
+2025-05-29 07:12:53,976 - marketml_project - INFO - Successfully completed stage: analyze_performance
+2025-05-29 07:12:53,976 - marketml_project - INFO - Pipeline finished.
