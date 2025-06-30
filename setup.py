@@ -2,15 +2,6 @@
 import os
 from setuptools import setup, find_packages
 
-# Get version from marketml/__init__.py
-def get_version():
-    version_filepath = os.path.join(os.path.dirname(__file__), 'marketml', '__init__.py')
-    with open(version_filepath) as f:
-        for line in f:
-            if line.startswith('__version__'):
-                return line.strip().split()[-1].strip("'")
-    return "0.0.1"
-
 # Requirements
 with open('requirements.txt') as f:
     install_requires = f.read().splitlines()
@@ -21,7 +12,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='marketml',
-    version=get_version(),
+    version="0.1.1",
     author='Nguyen Duc Minh Hoang',
     author_email='hoang.nguyenducminh@gmail.com',
     description='Market trend forecasting and portfolio optimization for thesis',
