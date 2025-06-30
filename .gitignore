@@ -7,7 +7,7 @@ __pycache__/
 .vscode/
 
 # Data files
-*.csv
+# *.csv
 *.xlsx
 *.pkl
 *.parquet

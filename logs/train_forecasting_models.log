@@ -1,0 +1,662 @@
+2025-06-30 21:43:40,004 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/train_forecasting_models.log
+2025-06-30 21:43:40,005 - marketml_project - INFO - Random seeds set to: 42
+2025-06-30 21:43:40,020 - marketml_project - INFO - Starting: 02_train_forecasting_models pipeline
+2025-06-30 21:43:40,020 - marketml_project - INFO - Loading enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_processed/price_data_enriched_v2.csv
+2025-06-30 21:43:40,130 - marketml_project - INFO - Enriched data loaded successfully.
+2025-06-30 21:43:40,132 - marketml_project - INFO - Starting Cross-Validation Runs for forecasting models...
+2025-06-30 21:43:40,132 - marketml_project - INFO - Using 22 features for ML models: ['BB_Lower', 'BB_Upper', 'EMA_20', 'MACD', 'MACD_Hist', 'MACD_Signal', 'OBV', 'RSI', 'RSI_roll_mean_10', 'RSI_roll_mean_5', 'RSI_roll_std_10', 'RSI_roll_std_5', 'close_roll_mean_10', 'close_roll_mean_5', 'close_roll_std_10', 'close_roll_std_5', 'close_zscore_20', 'garch_vol_forecast', 'pct_change_lag_1', 'pct_change_lag_3', 'pct_change_lag_5', 'volume']
+2025-06-30 21:43:40,132 - marketml_project - INFO - Generating CV splits (Expanding Window):
+2025-06-30 21:43:40,133 - marketml_project - INFO -   Initial Train: 365 days 00:00:00, Test Period: 365 days 00:00:00, Step Period: 365 days 00:00:00
+2025-06-30 21:43:40,140 - marketml_project - INFO -   Split 0: Train [2020-01-02:2020-12-31], Test [2021-01-04:2021-12-31]
+2025-06-30 21:43:40,140 - marketml_project - INFO - ===== Processing CV Split 0 =====
+2025-06-30 21:43:40,140 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-06-30 21:43:40,164 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-06-30 21:43:40,192 - marketml_project - INFO -   Sequence shapes: X_train=(3785, 10, 22), y_train=(3785,), X_test=(3771, 10, 22)
+2025-06-30 21:43:40,192 - marketml_project - INFO -   Class weights for Keras: {0: 0.7851068243103091, 1: 3.6676356589147288, 2: 0.687931661214104}
+2025-06-30 21:43:40,193 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-06-30 21:43:40,193 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-06-30 21:43:40,193 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-06-30 21:44:36,368 - marketml_project - INFO - --- Evaluating ARIMA ---
+2025-06-30 21:44:36,415 - marketml_project - INFO -   Accuracy: 0.2555
+2025-06-30 21:44:36,415 - marketml_project - INFO -   Classification Report (ARIMA):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.57      0.00      0.01      1527
+No Change (0)       0.14      0.75      0.24       470
+ Increase (1)       0.48      0.34      0.40      1768
+
+     accuracy                           0.26      3765
+    macro avg       0.40      0.37      0.21      3765
+ weighted avg       0.48      0.26      0.22      3765
+
+2025-06-30 21:44:36,416 - marketml_project - INFO -   Running RandomForest model evaluation...
+2025-06-30 21:44:36,416 - marketml_project - INFO - --- Training and Evaluating RandomForest Model (with Tuning) ---
+2025-06-30 21:44:36,416 - marketml_project - INFO -   Performing RandomizedSearchCV for RandomForest (n_iter=30, cv=3)...
+2025-06-30 21:47:24,137 - marketml_project - INFO -   Best RandomForest params found: {'bootstrap': True, 'criterion': 'gini', 'max_depth': 11, 'min_samples_leaf': 12, 'min_samples_split': 17, 'n_estimators': 261}
+2025-06-30 21:47:24,137 - marketml_project - INFO -   Predicting with best RandomForest...
+2025-06-30 21:47:24,205 - marketml_project - INFO - --- Evaluating RandomForest ---
+2025-06-30 21:47:24,226 - marketml_project - INFO -   Accuracy: 0.3899
+2025-06-30 21:47:24,226 - marketml_project - INFO -   Classification Report (RandomForest):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.41      0.41      1530
+No Change (0)       0.17      0.29      0.21       471
+ Increase (1)       0.49      0.40      0.44      1779
+
+     accuracy                           0.39      3780
+    macro avg       0.36      0.37      0.35      3780
+ weighted avg       0.42      0.39      0.40      3780
+
+2025-06-30 21:47:24,227 - marketml_project - INFO -   Running XGBoost model evaluation...
+2025-06-30 21:47:24,227 - marketml_project - INFO - --- Training and Evaluating XGBoost Model (with Tuning) ---
+2025-06-30 21:47:24,227 - marketml_project - INFO -   Performing RandomizedSearchCV for XGBoost (n_iter=30, cv=3)...
+2025-06-30 21:47:54,090 - marketml_project - INFO -   Best XGBoost params found: {'colsample_bytree': 0.6541666010159665, 'gamma': 0.007983126110107097, 'learning_rate': 0.030780444305993408, 'max_depth': 6, 'n_estimators': 210, 'subsample': 0.7733054075301833}
+2025-06-30 21:47:54,090 - marketml_project - INFO -   Predicting with best XGBoost...
+2025-06-30 21:47:54,107 - marketml_project - INFO - --- Evaluating XGBoost ---
+2025-06-30 21:47:54,122 - marketml_project - INFO -   Accuracy: 0.4466
+2025-06-30 21:47:54,122 - marketml_project - INFO -   Classification Report (XGBoost):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.46      0.44      1530
+No Change (0)       0.00      0.00      0.00       471
+ Increase (1)       0.48      0.55      0.51      1779
+
+     accuracy                           0.45      3780
+    macro avg       0.30      0.34      0.32      3780
+ weighted avg       0.39      0.45      0.42      3780
+
+2025-06-30 21:47:54,123 - marketml_project - INFO -   Running SVM model evaluation...
+2025-06-30 21:47:54,123 - marketml_project - INFO - --- Training and Evaluating SVM Model (with Tuning) ---
+2025-06-30 21:47:54,123 - marketml_project - INFO -   Performing RandomizedSearchCV for SVM (n_iter=30, cv=3)...
+2025-06-30 21:48:13,011 - marketml_project - INFO -   Best SVM params found: {'C': 1.6523315728128767, 'degree': 2, 'gamma': 'auto', 'kernel': 'rbf'}
+2025-06-30 21:48:13,011 - marketml_project - INFO -   Predicting with best SVM...
+2025-06-30 21:48:13,973 - marketml_project - INFO - --- Evaluating SVM ---
+2025-06-30 21:48:14,023 - marketml_project - INFO -   Accuracy: 0.3074
+2025-06-30 21:48:14,024 - marketml_project - INFO -   Classification Report (SVM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.44      0.36      0.39      1530
+No Change (0)       0.15      0.59      0.23       471
+ Increase (1)       0.53      0.19      0.28      1779
+
+     accuracy                           0.31      3780
+    macro avg       0.37      0.38      0.30      3780
+ weighted avg       0.44      0.31      0.32      3780
+
+2025-06-30 21:48:14,024 - marketml_project - INFO -   Running LSTM model evaluation...
+2025-06-30 21:48:14,024 - marketml_project - INFO - --- Training and Evaluating LSTM Model ---
+2025-06-30 21:48:14,326 - marketml_project - INFO -   Training LSTM with params: units=128, dropout=0.25, lr=5e-05, epochs=50, batch_size=64
+2025-06-30 21:48:14,444 - marketml_project - INFO -     Training LSTM for up to 50 epochs...
+2025-06-30 21:48:31,451 - marketml_project - INFO -     LSTM training finished after 23 epochs.
+2025-06-30 21:48:31,452 - marketml_project - INFO -     Predicting with LSTM...
+2025-06-30 21:48:32,400 - marketml_project - INFO - --- Evaluating LSTM ---
+2025-06-30 21:48:32,421 - marketml_project - INFO -   Accuracy: 0.2875
+2025-06-30 21:48:32,421 - marketml_project - INFO -   Classification Report (LSTM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.45      0.19      0.26      1526
+No Change (0)       0.15      0.72      0.25       470
+ Increase (1)       0.50      0.26      0.34      1775
+
+     accuracy                           0.29      3771
+    macro avg       0.37      0.39      0.29      3771
+ weighted avg       0.44      0.29      0.30      3771
+
+2025-06-30 21:48:32,422 - marketml_project - INFO -   Running Transformer model evaluation...
+2025-06-30 21:48:32,422 - marketml_project - INFO - --- Training and Evaluating Transformer Model ---
+2025-06-30 21:48:32,729 - marketml_project - INFO -   Training Transformer with params: blocks=2, head_size=128, num_heads=4, ff_dim=128, dropout=0.35, lr=5e-05, epochs=50, batch_size=64, wd=0.0001
+2025-06-30 21:48:32,929 - marketml_project - INFO -     Using AdamW with CosineDecay learning rate schedule.
+2025-06-30 21:48:32,931 - marketml_project - INFO -     Training Transformer for up to 50 epochs...
+2025-06-30 21:49:00,574 - marketml_project - INFO -     Transformer training finished after 11 epochs.
+2025-06-30 21:49:00,574 - marketml_project - INFO -     Predicting with Transformer...
+2025-06-30 21:49:01,583 - marketml_project - INFO - --- Evaluating Transformer ---
+2025-06-30 21:49:01,599 - marketml_project - INFO -   Accuracy: 0.3002
+2025-06-30 21:49:01,600 - marketml_project - INFO -   Classification Report (Transformer):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.38      0.29      0.33      1526
+No Change (0)       0.11      0.37      0.18       470
+ Increase (1)       0.47      0.29      0.36      1775
+
+     accuracy                           0.30      3771
+    macro avg       0.32      0.32      0.29      3771
+ weighted avg       0.39      0.30      0.32      3771
+
+2025-06-30 21:49:01,600 - marketml_project - INFO - ===== Finished CV Split 0 =====
+2025-06-30 21:49:01,606 - marketml_project - INFO -   Split 1: Train [2020-01-02:2021-12-31], Test [2022-01-03:2022-12-30]
+2025-06-30 21:49:01,606 - marketml_project - INFO - ===== Processing CV Split 1 =====
+2025-06-30 21:49:01,607 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-06-30 21:49:01,624 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-06-30 21:49:01,688 - marketml_project - INFO -   Sequence shapes: X_train=(7565, 10, 22), y_train=(7565,), X_test=(3756, 10, 22)
+2025-06-30 21:49:01,688 - marketml_project - INFO -   Class weights for Keras: {0: 0.8007833174552768, 1: 3.152083333333333, 2: 0.6973635693215339}
+2025-06-30 21:49:01,688 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-06-30 21:49:01,689 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-06-30 21:49:01,689 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-06-30 21:50:03,987 - marketml_project - INFO - --- Evaluating ARIMA ---
+2025-06-30 21:50:04,003 - marketml_project - INFO -   Accuracy: 0.1877
+2025-06-30 21:50:04,003 - marketml_project - INFO -   Classification Report (ARIMA):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.50      0.00      0.00      1770
+No Change (0)       0.09      0.78      0.17       326
+ Increase (1)       0.45      0.27      0.34      1654
+
+     accuracy                           0.19      3750
+    macro avg       0.35      0.35      0.17      3750
+ weighted avg       0.44      0.19      0.16      3750
+
+2025-06-30 21:50:04,005 - marketml_project - INFO -   Running RandomForest model evaluation...
+2025-06-30 21:50:04,006 - marketml_project - INFO - --- Training and Evaluating RandomForest Model (with Tuning) ---
+2025-06-30 21:50:04,006 - marketml_project - INFO -   Performing RandomizedSearchCV for RandomForest (n_iter=30, cv=3)...
+2025-06-30 21:56:06,863 - marketml_project - INFO -   Best RandomForest params found: {'bootstrap': True, 'criterion': 'gini', 'max_depth': 11, 'min_samples_leaf': 12, 'min_samples_split': 17, 'n_estimators': 261}
+2025-06-30 21:56:06,865 - marketml_project - INFO -   Predicting with best RandomForest...
+2025-06-30 21:56:06,965 - marketml_project - INFO - --- Evaluating RandomForest ---
+2025-06-30 21:56:06,977 - marketml_project - INFO -   Accuracy: 0.4258
+2025-06-30 21:56:06,977 - marketml_project - INFO -   Classification Report (RandomForest):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.48      0.35      0.41      1780
+No Change (0)       0.14      0.21      0.17       326
+ Increase (1)       0.45      0.55      0.50      1659
+
+     accuracy                           0.43      3765
+    macro avg       0.36      0.37      0.36      3765
+ weighted avg       0.44      0.43      0.43      3765
+
+2025-06-30 21:56:06,978 - marketml_project - INFO -   Running XGBoost model evaluation...
+2025-06-30 21:56:06,978 - marketml_project - INFO - --- Training and Evaluating XGBoost Model (with Tuning) ---
+2025-06-30 21:56:06,978 - marketml_project - INFO -   Performing RandomizedSearchCV for XGBoost (n_iter=30, cv=3)...
+2025-06-30 21:56:44,796 - marketml_project - INFO -   Best XGBoost params found: {'colsample_bytree': 0.7159364365206693, 'gamma': 0.1015306123673847, 'learning_rate': 0.09485682135021828, 'max_depth': 5, 'n_estimators': 286, 'subsample': 0.7779139732158818}
+2025-06-30 21:56:44,796 - marketml_project - INFO -   Predicting with best XGBoost...
+2025-06-30 21:56:44,810 - marketml_project - INFO - --- Evaluating XGBoost ---
+2025-06-30 21:56:44,825 - marketml_project - INFO -   Accuracy: 0.4600
+2025-06-30 21:56:44,826 - marketml_project - INFO -   Classification Report (XGBoost):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.49      0.33      0.39      1780
+No Change (0)       0.20      0.01      0.02       326
+ Increase (1)       0.45      0.69      0.54      1659
+
+     accuracy                           0.46      3765
+    macro avg       0.38      0.34      0.32      3765
+ weighted avg       0.45      0.46      0.43      3765
+
+2025-06-30 21:56:44,827 - marketml_project - INFO -   Running SVM model evaluation...
+2025-06-30 21:56:44,827 - marketml_project - INFO - --- Training and Evaluating SVM Model (with Tuning) ---
+2025-06-30 21:56:44,827 - marketml_project - INFO -   Performing RandomizedSearchCV for SVM (n_iter=30, cv=3)...
+2025-06-30 21:58:03,191 - marketml_project - INFO -   Best SVM params found: {'C': 0.9190821536272645, 'degree': 4, 'gamma': 0.060151389673146566, 'kernel': 'rbf'}
+2025-06-30 21:58:03,193 - marketml_project - INFO -   Predicting with best SVM...
+2025-06-30 21:58:05,027 - marketml_project - INFO - --- Evaluating SVM ---
+2025-06-30 21:58:05,037 - marketml_project - INFO -   Accuracy: 0.3734
+2025-06-30 21:58:05,037 - marketml_project - INFO -   Classification Report (SVM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.49      0.32      0.39      1780
+No Change (0)       0.13      0.48      0.20       326
+ Increase (1)       0.49      0.41      0.45      1659
+
+     accuracy                           0.37      3765
+    macro avg       0.37      0.40      0.35      3765
+ weighted avg       0.46      0.37      0.40      3765
+
+2025-06-30 21:58:05,037 - marketml_project - INFO -   Running LSTM model evaluation...
+2025-06-30 21:58:05,037 - marketml_project - INFO - --- Training and Evaluating LSTM Model ---
+2025-06-30 21:58:05,446 - marketml_project - INFO -   Training LSTM with params: units=128, dropout=0.25, lr=5e-05, epochs=50, batch_size=64
+2025-06-30 21:58:05,498 - marketml_project - INFO -     Training LSTM for up to 50 epochs...
+2025-06-30 21:58:17,868 - marketml_project - INFO -     LSTM training finished after 11 epochs.
+2025-06-30 21:58:17,868 - marketml_project - INFO -     Predicting with LSTM...
+2025-06-30 21:58:19,177 - marketml_project - INFO - --- Evaluating LSTM ---
+2025-06-30 21:58:19,188 - marketml_project - INFO -   Accuracy: 0.3134
+2025-06-30 21:58:19,188 - marketml_project - INFO -   Classification Report (LSTM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.47      0.31      0.38      1776
+No Change (0)       0.09      0.40      0.15       324
+ Increase (1)       0.43      0.30      0.35      1656
+
+     accuracy                           0.31      3756
+    macro avg       0.33      0.34      0.29      3756
+ weighted avg       0.42      0.31      0.35      3756
+
+2025-06-30 21:58:19,188 - marketml_project - INFO -   Running Transformer model evaluation...
+2025-06-30 21:58:19,188 - marketml_project - INFO - --- Training and Evaluating Transformer Model ---
+2025-06-30 21:58:19,475 - marketml_project - INFO -   Training Transformer with params: blocks=2, head_size=128, num_heads=4, ff_dim=128, dropout=0.35, lr=5e-05, epochs=50, batch_size=64, wd=0.0001
+2025-06-30 21:58:19,581 - marketml_project - INFO -     Using AdamW with CosineDecay learning rate schedule.
+2025-06-30 21:58:19,584 - marketml_project - INFO -     Training Transformer for up to 50 epochs...
+2025-06-30 22:04:29,545 - marketml_project - INFO -     Transformer training finished after 50 epochs.
+2025-06-30 22:04:29,546 - marketml_project - INFO -     Predicting with Transformer...
+2025-06-30 22:04:36,177 - marketml_project - INFO - --- Evaluating Transformer ---
+2025-06-30 22:04:36,280 - marketml_project - INFO -   Accuracy: 0.3299
+2025-06-30 22:04:36,281 - marketml_project - INFO -   Classification Report (Transformer):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.47      0.30      0.37      1776
+No Change (0)       0.11      0.46      0.17       324
+ Increase (1)       0.47      0.33      0.39      1656
+
+     accuracy                           0.33      3756
+    macro avg       0.35      0.37      0.31      3756
+ weighted avg       0.44      0.33      0.36      3756
+
+2025-06-30 22:04:36,282 - marketml_project - INFO - ===== Finished CV Split 1 =====
+2025-06-30 22:04:36,301 - marketml_project - INFO -   Split 2: Train [2020-01-02:2022-12-30], Test [2023-01-03:2023-12-29]
+2025-06-30 22:04:36,302 - marketml_project - INFO - ===== Processing CV Split 2 =====
+2025-06-30 22:04:36,303 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-06-30 22:04:36,493 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-06-30 22:04:36,788 - marketml_project - INFO -   Sequence shapes: X_train=(11330, 10, 22), y_train=(11330,), X_test=(3741, 10, 22)
+2025-06-30 22:04:36,789 - marketml_project - INFO -   Class weights for Keras: {0: 0.7657474993241417, 1: 3.3932315064390535, 2: 0.7146010722169662}
+2025-06-30 22:04:36,789 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-06-30 22:04:36,792 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-06-30 22:04:36,793 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-06-30 22:07:56,306 - marketml_project - INFO - --- Evaluating ARIMA ---
+2025-06-30 22:07:56,409 - marketml_project - INFO -   Accuracy: 0.1553
+2025-06-30 22:07:56,410 - marketml_project - INFO -   Classification Report (ARIMA):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.33      0.00      0.00      1494
+No Change (0)       0.13      0.97      0.23       461
+ Increase (1)       0.51      0.07      0.13      1780
+
+     accuracy                           0.16      3735
+    macro avg       0.32      0.35      0.12      3735
+ weighted avg       0.39      0.16      0.09      3735
+
+2025-06-30 22:07:56,413 - marketml_project - INFO -   Running RandomForest model evaluation...
+2025-06-30 22:07:56,413 - marketml_project - INFO - --- Training and Evaluating RandomForest Model (with Tuning) ---
+2025-06-30 22:07:56,413 - marketml_project - INFO -   Performing RandomizedSearchCV for RandomForest (n_iter=30, cv=3)...
+2025-06-30 22:11:00,449 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/train_forecasting_models.log
+2025-06-30 22:11:00,450 - marketml_project - INFO - Random seeds set to: 42
+2025-06-30 22:11:00,473 - marketml_project - INFO - Starting: 02_train_forecasting_models pipeline
+2025-06-30 22:11:00,473 - marketml_project - INFO - Loading enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_processed/price_data_enriched_v2.csv
+2025-06-30 22:11:00,583 - marketml_project - INFO - Enriched data loaded successfully.
+2025-06-30 22:11:00,583 - marketml_project - INFO - Starting Cross-Validation Runs for forecasting models...
+2025-06-30 22:11:00,583 - marketml_project - INFO - Using 22 features for ML models: ['BB_Lower', 'BB_Upper', 'EMA_20', 'MACD', 'MACD_Hist', 'MACD_Signal', 'OBV', 'RSI', 'RSI_roll_mean_10', 'RSI_roll_mean_5', 'RSI_roll_std_10', 'RSI_roll_std_5', 'close_roll_mean_10', 'close_roll_mean_5', 'close_roll_std_10', 'close_roll_std_5', 'close_zscore_20', 'garch_vol_forecast', 'pct_change_lag_1', 'pct_change_lag_3', 'pct_change_lag_5', 'volume']
+2025-06-30 22:11:00,584 - marketml_project - INFO - Generating CV splits (Expanding Window):
+2025-06-30 22:11:00,584 - marketml_project - INFO -   Initial Train: 365 days 00:00:00, Test Period: 365 days 00:00:00, Step Period: 365 days 00:00:00
+2025-06-30 22:11:00,587 - marketml_project - INFO -   Split 0: Train [2020-01-02:2020-12-31], Test [2021-01-04:2021-12-31]
+2025-06-30 22:11:00,587 - marketml_project - INFO - ===== Processing CV Split 0 =====
+2025-06-30 22:11:00,587 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-06-30 22:11:00,600 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-06-30 22:11:00,621 - marketml_project - INFO -   Sequence shapes: X_train=(3785, 10, 22), y_train=(3785,), X_test=(3771, 10, 22)
+2025-06-30 22:11:00,622 - marketml_project - INFO -   Class weights for Keras: {0: 0.7851068243103091, 1: 3.6676356589147288, 2: 0.687931661214104}
+2025-06-30 22:11:00,622 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-06-30 22:11:00,622 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-06-30 22:11:00,622 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-06-30 22:11:49,653 - marketml_project - INFO - --- Evaluating ARIMA ---
+2025-06-30 22:11:49,668 - marketml_project - INFO -   Accuracy: 0.2555
+2025-06-30 22:11:49,668 - marketml_project - INFO -   Classification Report (ARIMA):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.57      0.00      0.01      1527
+No Change (0)       0.14      0.75      0.24       470
+ Increase (1)       0.48      0.34      0.40      1768
+
+     accuracy                           0.26      3765
+    macro avg       0.40      0.37      0.21      3765
+ weighted avg       0.48      0.26      0.22      3765
+
+2025-06-30 22:11:49,668 - marketml_project - INFO -   Running RandomForest model evaluation...
+2025-06-30 22:11:49,669 - marketml_project - INFO - --- Training and Evaluating RandomForest Model (with Tuning) ---
+2025-06-30 22:11:49,669 - marketml_project - INFO -   Performing RandomizedSearchCV for RandomForest (n_iter=30, cv=3)...
+2025-06-30 22:14:34,158 - marketml_project - INFO -   Best RandomForest params found: {'bootstrap': True, 'criterion': 'gini', 'max_depth': 11, 'min_samples_leaf': 12, 'min_samples_split': 17, 'n_estimators': 261}
+2025-06-30 22:14:34,158 - marketml_project - INFO -   Predicting with best RandomForest...
+2025-06-30 22:14:34,317 - marketml_project - INFO - --- Evaluating RandomForest ---
+2025-06-30 22:14:34,342 - marketml_project - INFO -   Accuracy: 0.3899
+2025-06-30 22:14:34,343 - marketml_project - INFO -   Classification Report (RandomForest):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.41      0.41      1530
+No Change (0)       0.17      0.29      0.21       471
+ Increase (1)       0.49      0.40      0.44      1779
+
+     accuracy                           0.39      3780
+    macro avg       0.36      0.37      0.35      3780
+ weighted avg       0.42      0.39      0.40      3780
+
+2025-06-30 22:14:34,344 - marketml_project - INFO -   Running XGBoost model evaluation...
+2025-06-30 22:14:34,345 - marketml_project - INFO - --- Training and Evaluating XGBoost Model (with Tuning) ---
+2025-06-30 22:14:34,345 - marketml_project - INFO -   Performing RandomizedSearchCV for XGBoost (n_iter=30, cv=3)...
+2025-06-30 22:15:17,288 - marketml_project - INFO -   Best XGBoost params found: {'colsample_bytree': 0.6541666010159665, 'gamma': 0.007983126110107097, 'learning_rate': 0.030780444305993408, 'max_depth': 6, 'n_estimators': 210, 'subsample': 0.7733054075301833}
+2025-06-30 22:15:17,289 - marketml_project - INFO -   Predicting with best XGBoost...
+2025-06-30 22:15:17,306 - marketml_project - INFO - --- Evaluating XGBoost ---
+2025-06-30 22:15:17,363 - marketml_project - INFO -   Accuracy: 0.4466
+2025-06-30 22:15:17,364 - marketml_project - INFO -   Classification Report (XGBoost):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.46      0.44      1530
+No Change (0)       0.00      0.00      0.00       471
+ Increase (1)       0.48      0.55      0.51      1779
+
+     accuracy                           0.45      3780
+    macro avg       0.30      0.34      0.32      3780
+ weighted avg       0.39      0.45      0.42      3780
+
+2025-06-30 22:15:17,365 - marketml_project - INFO -   Running SVM model evaluation...
+2025-06-30 22:15:17,365 - marketml_project - INFO - --- Training and Evaluating SVM Model (with Tuning) ---
+2025-06-30 22:15:17,366 - marketml_project - INFO -   Performing RandomizedSearchCV for SVM (n_iter=30, cv=3)...
+2025-06-30 22:15:41,485 - marketml_project - INFO -   Best SVM params found: {'C': 1.6523315728128767, 'degree': 2, 'gamma': 'auto', 'kernel': 'rbf'}
+2025-06-30 22:15:41,486 - marketml_project - INFO -   Predicting with best SVM...
+2025-06-30 22:15:42,589 - marketml_project - INFO - --- Evaluating SVM ---
+2025-06-30 22:15:42,610 - marketml_project - INFO -   Accuracy: 0.3074
+2025-06-30 22:15:42,611 - marketml_project - INFO -   Classification Report (SVM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.44      0.36      0.39      1530
+No Change (0)       0.15      0.59      0.23       471
+ Increase (1)       0.53      0.19      0.28      1779
+
+     accuracy                           0.31      3780
+    macro avg       0.37      0.38      0.30      3780
+ weighted avg       0.44      0.31      0.32      3780
+
+2025-06-30 22:15:42,611 - marketml_project - INFO -   Running LSTM model evaluation...
+2025-06-30 22:15:42,611 - marketml_project - INFO - --- Training and Evaluating LSTM Model ---
+2025-06-30 22:15:42,989 - marketml_project - INFO -   Training LSTM with params: units=128, dropout=0.25, lr=5e-05, epochs=50, batch_size=64
+2025-06-30 22:15:43,062 - marketml_project - INFO -     Training LSTM for up to 50 epochs...
+2025-06-30 22:16:06,468 - marketml_project - INFO -     LSTM training finished after 23 epochs.
+2025-06-30 22:16:06,469 - marketml_project - INFO -     Predicting with LSTM...
+2025-06-30 22:16:09,116 - marketml_project - INFO - --- Evaluating LSTM ---
+2025-06-30 22:16:09,131 - marketml_project - INFO -   Accuracy: 0.2875
+2025-06-30 22:16:09,131 - marketml_project - INFO -   Classification Report (LSTM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.45      0.19      0.26      1526
+No Change (0)       0.15      0.72      0.25       470
+ Increase (1)       0.50      0.26      0.34      1775
+
+     accuracy                           0.29      3771
+    macro avg       0.37      0.39      0.29      3771
+ weighted avg       0.44      0.29      0.30      3771
+
+2025-06-30 22:16:09,131 - marketml_project - INFO -   Running Transformer model evaluation...
+2025-06-30 22:16:09,131 - marketml_project - INFO - --- Training and Evaluating Transformer Model ---
+2025-06-30 22:16:09,578 - marketml_project - INFO -   Training Transformer with params: blocks=2, head_size=128, num_heads=4, ff_dim=128, dropout=0.35, lr=5e-05, epochs=50, batch_size=64, wd=0.0001
+2025-06-30 22:16:09,796 - marketml_project - INFO -     Using AdamW with CosineDecay learning rate schedule.
+2025-06-30 22:16:09,834 - marketml_project - INFO -     Training Transformer for up to 50 epochs...
+2025-06-30 22:18:28,104 - marketml_project - INFO -     Transformer training finished after 11 epochs.
+2025-06-30 22:18:28,105 - marketml_project - INFO -     Predicting with Transformer...
+2025-06-30 22:18:29,657 - marketml_project - INFO - --- Evaluating Transformer ---
+2025-06-30 22:18:29,711 - marketml_project - INFO -   Accuracy: 0.3002
+2025-06-30 22:18:29,711 - marketml_project - INFO -   Classification Report (Transformer):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.38      0.29      0.33      1526
+No Change (0)       0.11      0.37      0.18       470
+ Increase (1)       0.47      0.29      0.36      1775
+
+     accuracy                           0.30      3771
+    macro avg       0.32      0.32      0.29      3771
+ weighted avg       0.39      0.30      0.32      3771
+
+2025-06-30 22:18:29,712 - marketml_project - INFO - ===== Finished CV Split 0 =====
+2025-06-30 22:18:29,718 - marketml_project - INFO -   Split 1: Train [2020-01-02:2021-12-31], Test [2022-01-03:2022-12-30]
+2025-06-30 22:18:29,719 - marketml_project - INFO - ===== Processing CV Split 1 =====
+2025-06-30 22:18:29,719 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-06-30 22:18:29,745 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-06-30 22:18:29,811 - marketml_project - INFO -   Sequence shapes: X_train=(7565, 10, 22), y_train=(7565,), X_test=(3756, 10, 22)
+2025-06-30 22:18:29,812 - marketml_project - INFO -   Class weights for Keras: {0: 0.8007833174552768, 1: 3.152083333333333, 2: 0.6973635693215339}
+2025-06-30 22:18:29,812 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-06-30 22:18:29,813 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-06-30 22:18:29,813 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-06-30 22:19:53,562 - marketml_project - INFO - --- Evaluating ARIMA ---
+2025-06-30 22:19:53,576 - marketml_project - INFO -   Accuracy: 0.1877
+2025-06-30 22:19:53,576 - marketml_project - INFO -   Classification Report (ARIMA):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.50      0.00      0.00      1770
+No Change (0)       0.09      0.78      0.17       326
+ Increase (1)       0.45      0.27      0.34      1654
+
+     accuracy                           0.19      3750
+    macro avg       0.35      0.35      0.17      3750
+ weighted avg       0.44      0.19      0.16      3750
+
+2025-06-30 22:19:53,577 - marketml_project - INFO -   Running RandomForest model evaluation...
+2025-06-30 22:19:53,577 - marketml_project - INFO - --- Training and Evaluating RandomForest Model (with Tuning) ---
+2025-06-30 22:19:53,577 - marketml_project - INFO -   Performing RandomizedSearchCV for RandomForest (n_iter=30, cv=3)...
+2025-06-30 22:26:53,716 - marketml_project - INFO -   Best RandomForest params found: {'bootstrap': True, 'criterion': 'gini', 'max_depth': 11, 'min_samples_leaf': 12, 'min_samples_split': 17, 'n_estimators': 261}
+2025-06-30 22:26:53,717 - marketml_project - INFO -   Predicting with best RandomForest...
+2025-06-30 22:26:53,782 - marketml_project - INFO - --- Evaluating RandomForest ---
+2025-06-30 22:26:53,794 - marketml_project - INFO -   Accuracy: 0.4258
+2025-06-30 22:26:53,794 - marketml_project - INFO -   Classification Report (RandomForest):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.48      0.35      0.41      1780
+No Change (0)       0.14      0.21      0.17       326
+ Increase (1)       0.45      0.55      0.50      1659
+
+     accuracy                           0.43      3765
+    macro avg       0.36      0.37      0.36      3765
+ weighted avg       0.44      0.43      0.43      3765
+
+2025-06-30 22:26:53,795 - marketml_project - INFO -   Running XGBoost model evaluation...
+2025-06-30 22:26:53,795 - marketml_project - INFO - --- Training and Evaluating XGBoost Model (with Tuning) ---
+2025-06-30 22:26:53,795 - marketml_project - INFO -   Performing RandomizedSearchCV for XGBoost (n_iter=30, cv=3)...
+2025-06-30 22:27:48,011 - marketml_project - INFO -   Best XGBoost params found: {'colsample_bytree': 0.7159364365206693, 'gamma': 0.1015306123673847, 'learning_rate': 0.09485682135021828, 'max_depth': 5, 'n_estimators': 286, 'subsample': 0.7779139732158818}
+2025-06-30 22:27:48,011 - marketml_project - INFO -   Predicting with best XGBoost...
+2025-06-30 22:27:48,058 - marketml_project - INFO - --- Evaluating XGBoost ---
+2025-06-30 22:27:48,074 - marketml_project - INFO -   Accuracy: 0.4600
+2025-06-30 22:27:48,074 - marketml_project - INFO -   Classification Report (XGBoost):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.49      0.33      0.39      1780
+No Change (0)       0.20      0.01      0.02       326
+ Increase (1)       0.45      0.69      0.54      1659
+
+     accuracy                           0.46      3765
+    macro avg       0.38      0.34      0.32      3765
+ weighted avg       0.45      0.46      0.43      3765
+
+2025-06-30 22:27:48,075 - marketml_project - INFO -   Running SVM model evaluation...
+2025-06-30 22:27:48,075 - marketml_project - INFO - --- Training and Evaluating SVM Model (with Tuning) ---
+2025-06-30 22:27:48,075 - marketml_project - INFO -   Performing RandomizedSearchCV for SVM (n_iter=30, cv=3)...
+2025-06-30 22:29:28,566 - marketml_project - INFO -   Best SVM params found: {'C': 0.9190821536272645, 'degree': 4, 'gamma': 0.060151389673146566, 'kernel': 'rbf'}
+2025-06-30 22:29:28,567 - marketml_project - INFO -   Predicting with best SVM...
+2025-06-30 22:29:30,603 - marketml_project - INFO - --- Evaluating SVM ---
+2025-06-30 22:29:30,627 - marketml_project - INFO -   Accuracy: 0.3734
+2025-06-30 22:29:30,628 - marketml_project - INFO -   Classification Report (SVM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.49      0.32      0.39      1780
+No Change (0)       0.13      0.48      0.20       326
+ Increase (1)       0.49      0.41      0.45      1659
+
+     accuracy                           0.37      3765
+    macro avg       0.37      0.40      0.35      3765
+ weighted avg       0.46      0.37      0.40      3765
+
+2025-06-30 22:29:30,628 - marketml_project - INFO -   Running LSTM model evaluation...
+2025-06-30 22:29:30,628 - marketml_project - INFO - --- Training and Evaluating LSTM Model ---
+2025-06-30 22:29:31,097 - marketml_project - INFO -   Training LSTM with params: units=128, dropout=0.25, lr=5e-05, epochs=50, batch_size=64
+2025-06-30 22:29:31,200 - marketml_project - INFO -     Training LSTM for up to 50 epochs...
+2025-06-30 22:29:48,016 - marketml_project - INFO -     LSTM training finished after 11 epochs.
+2025-06-30 22:29:48,017 - marketml_project - INFO -     Predicting with LSTM...
+2025-06-30 22:29:49,217 - marketml_project - INFO - --- Evaluating LSTM ---
+2025-06-30 22:29:49,234 - marketml_project - INFO -   Accuracy: 0.3134
+2025-06-30 22:29:49,234 - marketml_project - INFO -   Classification Report (LSTM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.47      0.31      0.38      1776
+No Change (0)       0.09      0.40      0.15       324
+ Increase (1)       0.43      0.30      0.35      1656
+
+     accuracy                           0.31      3756
+    macro avg       0.33      0.34      0.29      3756
+ weighted avg       0.42      0.31      0.35      3756
+
+2025-06-30 22:29:49,234 - marketml_project - INFO -   Running Transformer model evaluation...
+2025-06-30 22:29:49,234 - marketml_project - INFO - --- Training and Evaluating Transformer Model ---
+2025-06-30 22:29:49,753 - marketml_project - INFO -   Training Transformer with params: blocks=2, head_size=128, num_heads=4, ff_dim=128, dropout=0.35, lr=5e-05, epochs=50, batch_size=64, wd=0.0001
+2025-06-30 22:29:49,962 - marketml_project - INFO -     Using AdamW with CosineDecay learning rate schedule.
+2025-06-30 22:29:49,968 - marketml_project - INFO -     Training Transformer for up to 50 epochs...
+2025-06-30 22:33:54,910 - marketml_project - INFO -     Transformer training finished after 50 epochs.
+2025-06-30 22:33:54,911 - marketml_project - INFO -     Predicting with Transformer...
+2025-06-30 22:33:56,460 - marketml_project - INFO - --- Evaluating Transformer ---
+2025-06-30 22:33:56,473 - marketml_project - INFO -   Accuracy: 0.3299
+2025-06-30 22:33:56,473 - marketml_project - INFO -   Classification Report (Transformer):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.47      0.30      0.37      1776
+No Change (0)       0.11      0.46      0.17       324
+ Increase (1)       0.47      0.33      0.39      1656
+
+     accuracy                           0.33      3756
+    macro avg       0.35      0.37      0.31      3756
+ weighted avg       0.44      0.33      0.36      3756
+
+2025-06-30 22:33:56,473 - marketml_project - INFO - ===== Finished CV Split 1 =====
+2025-06-30 22:33:56,487 - marketml_project - INFO -   Split 2: Train [2020-01-02:2022-12-30], Test [2023-01-03:2023-12-29]
+2025-06-30 22:33:56,488 - marketml_project - INFO - ===== Processing CV Split 2 =====
+2025-06-30 22:33:56,488 - marketml_project - INFO -   Preparing data for the current CV split...
+2025-06-30 22:33:56,524 - marketml_project - WARNING -     Feature 'garch_vol_forecast' is all NaN in training data for this split. Filling with 0 before imputation.
+2025-06-30 22:33:56,617 - marketml_project - INFO -   Sequence shapes: X_train=(11330, 10, 22), y_train=(11330,), X_test=(3741, 10, 22)
+2025-06-30 22:33:56,617 - marketml_project - INFO -   Class weights for Keras: {0: 0.7657474993241417, 1: 3.3932315064390535, 2: 0.7146010722169662}
+2025-06-30 22:33:56,617 - marketml_project - INFO -   Data preparation finished for the current CV split.
+2025-06-30 22:33:56,619 - marketml_project - INFO -   Running ARIMA model evaluation...
+2025-06-30 22:33:56,620 - marketml_project - INFO - --- Training and Evaluating ARIMA Model ---
+2025-06-30 22:34:44,265 - marketml_project - INFO - --- Evaluating ARIMA ---
+2025-06-30 22:34:44,276 - marketml_project - INFO -   Accuracy: 0.1553
+2025-06-30 22:34:44,276 - marketml_project - INFO -   Classification Report (ARIMA):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.33      0.00      0.00      1494
+No Change (0)       0.13      0.97      0.23       461
+ Increase (1)       0.51      0.07      0.13      1780
+
+     accuracy                           0.16      3735
+    macro avg       0.32      0.35      0.12      3735
+ weighted avg       0.39      0.16      0.09      3735
+
+2025-06-30 22:34:44,277 - marketml_project - INFO -   Running RandomForest model evaluation...
+2025-06-30 22:34:44,277 - marketml_project - INFO - --- Training and Evaluating RandomForest Model (with Tuning) ---
+2025-06-30 22:34:44,278 - marketml_project - INFO -   Performing RandomizedSearchCV for RandomForest (n_iter=30, cv=3)...
+2025-06-30 22:45:52,820 - marketml_project - INFO -   Best RandomForest params found: {'bootstrap': False, 'criterion': 'gini', 'max_depth': 18, 'min_samples_leaf': 10, 'min_samples_split': 16, 'n_estimators': 361}
+2025-06-30 22:45:52,820 - marketml_project - INFO -   Predicting with best RandomForest...
+2025-06-30 22:45:52,996 - marketml_project - INFO - --- Evaluating RandomForest ---
+2025-06-30 22:45:53,011 - marketml_project - INFO -   Accuracy: 0.3957
+2025-06-30 22:45:53,012 - marketml_project - INFO -   Classification Report (RandomForest):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.40      0.46      0.43      1498
+No Change (0)       0.14      0.18      0.16       461
+ Increase (1)       0.48      0.40      0.44      1791
+
+     accuracy                           0.40      3750
+    macro avg       0.34      0.35      0.34      3750
+ weighted avg       0.41      0.40      0.40      3750
+
+2025-06-30 22:45:53,014 - marketml_project - INFO -   Running XGBoost model evaluation...
+2025-06-30 22:45:53,014 - marketml_project - INFO - --- Training and Evaluating XGBoost Model (with Tuning) ---
+2025-06-30 22:45:53,014 - marketml_project - INFO -   Performing RandomizedSearchCV for XGBoost (n_iter=30, cv=3)...
+2025-06-30 22:46:44,443 - marketml_project - INFO -   Best XGBoost params found: {'colsample_bytree': 0.7159364365206693, 'gamma': 0.1015306123673847, 'learning_rate': 0.09485682135021828, 'max_depth': 5, 'n_estimators': 286, 'subsample': 0.7779139732158818}
+2025-06-30 22:46:44,444 - marketml_project - INFO -   Predicting with best XGBoost...
+2025-06-30 22:46:44,483 - marketml_project - INFO - --- Evaluating XGBoost ---
+2025-06-30 22:46:44,533 - marketml_project - INFO -   Accuracy: 0.4483
+2025-06-30 22:46:44,533 - marketml_project - INFO -   Classification Report (XGBoost):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.49      0.45      1498
+No Change (0)       0.20      0.01      0.02       461
+ Increase (1)       0.48      0.53      0.51      1791
+
+     accuracy                           0.45      3750
+    macro avg       0.37      0.34      0.32      3750
+ weighted avg       0.42      0.45      0.42      3750
+
+2025-06-30 22:46:44,534 - marketml_project - INFO -   Running SVM model evaluation...
+2025-06-30 22:46:44,535 - marketml_project - INFO - --- Training and Evaluating SVM Model (with Tuning) ---
+2025-06-30 22:46:44,535 - marketml_project - INFO -   Performing RandomizedSearchCV for SVM (n_iter=30, cv=3)...
+2025-06-30 22:50:18,004 - marketml_project - INFO -   Best SVM params found: {'C': 1.6523315728128767, 'degree': 2, 'gamma': 'auto', 'kernel': 'rbf'}
+2025-06-30 22:50:18,005 - marketml_project - INFO -   Predicting with best SVM...
+2025-06-30 22:50:21,275 - marketml_project - INFO - --- Evaluating SVM ---
+2025-06-30 22:50:21,287 - marketml_project - INFO -   Accuracy: 0.2629
+2025-06-30 22:50:21,287 - marketml_project - INFO -   Classification Report (SVM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.24      0.31      1498
+No Change (0)       0.14      0.68      0.23       461
+ Increase (1)       0.51      0.17      0.26      1791
+
+     accuracy                           0.26      3750
+    macro avg       0.35      0.36      0.26      3750
+ weighted avg       0.42      0.26      0.27      3750
+
+2025-06-30 22:50:21,288 - marketml_project - INFO -   Running LSTM model evaluation...
+2025-06-30 22:50:21,288 - marketml_project - INFO - --- Training and Evaluating LSTM Model ---
+2025-06-30 22:50:22,014 - marketml_project - INFO -   Training LSTM with params: units=128, dropout=0.25, lr=5e-05, epochs=50, batch_size=64
+2025-06-30 22:50:22,219 - marketml_project - INFO -     Training LSTM for up to 50 epochs...
+2025-06-30 22:50:49,120 - marketml_project - INFO -     LSTM training finished after 11 epochs.
+2025-06-30 22:50:49,121 - marketml_project - INFO -     Predicting with LSTM...
+2025-06-30 22:50:50,236 - marketml_project - INFO - --- Evaluating LSTM ---
+2025-06-30 22:50:50,251 - marketml_project - INFO -   Accuracy: 0.2892
+2025-06-30 22:50:50,251 - marketml_project - INFO -   Classification Report (LSTM):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.29      0.34      1497
+No Change (0)       0.13      0.52      0.21       460
+ Increase (1)       0.49      0.23      0.31      1784
+
+     accuracy                           0.29      3741
+    macro avg       0.34      0.35      0.29      3741
+ weighted avg       0.41      0.29      0.31      3741
+
+2025-06-30 22:50:50,251 - marketml_project - INFO -   Running Transformer model evaluation...
+2025-06-30 22:50:50,252 - marketml_project - INFO - --- Training and Evaluating Transformer Model ---
+2025-06-30 22:50:50,774 - marketml_project - INFO -   Training Transformer with params: blocks=2, head_size=128, num_heads=4, ff_dim=128, dropout=0.35, lr=5e-05, epochs=50, batch_size=64, wd=0.0001
+2025-06-30 22:50:50,944 - marketml_project - INFO -     Using AdamW with CosineDecay learning rate schedule.
+2025-06-30 22:50:50,948 - marketml_project - INFO -     Training Transformer for up to 50 epochs...
+2025-06-30 22:52:10,455 - marketml_project - INFO -     Transformer training finished after 11 epochs.
+2025-06-30 22:52:10,456 - marketml_project - INFO -     Predicting with Transformer...
+2025-06-30 22:52:11,938 - marketml_project - INFO - --- Evaluating Transformer ---
+2025-06-30 22:52:11,993 - marketml_project - INFO -   Accuracy: 0.2970
+2025-06-30 22:52:11,993 - marketml_project - INFO -   Classification Report (Transformer):
+               precision    recall  f1-score   support
+
+Decrease (-1)       0.41      0.22      0.29      1497
+No Change (0)       0.13      0.52      0.21       460
+ Increase (1)       0.47      0.30      0.37      1784
+
+     accuracy                           0.30      3741
+    macro avg       0.34      0.35      0.29      3741
+ weighted avg       0.40      0.30      0.32      3741
+
+2025-06-30 22:52:11,993 - marketml_project - INFO - ===== Finished CV Split 2 =====
+2025-06-30 22:52:12,004 - marketml_project - INFO - Stopping CV split generation: Test end date 2024-12-31 would exceed max data date 2024-12-30.
+2025-06-30 22:52:12,004 - marketml_project - INFO - Total CV splits generated: 3
+2025-06-30 22:52:12,004 - marketml_project - INFO - ===== Aggregating Results Across All CV Splits =====
+2025-06-30 22:52:12,105 - marketml_project - INFO - Detailed results per CV split saved to: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_detailed.csv
+2025-06-30 22:52:12,105 - marketml_project - INFO - --- Performance Summary (Mean +/- Std Dev across CV Splits) ---
+2025-06-30 22:52:12,154 - marketml_project - INFO - 
+                                   Mean +/- Std
+ARIMA_Accuracy                0.1995 +/- 0.0511
+ARIMA_F1_Macro                0.1673 +/- 0.0474
+ARIMA_F1_Weighted             0.1581 +/- 0.0647
+ARIMA_Precision_Macro         0.3565 +/- 0.0379
+ARIMA_Recall_Macro            0.3544 +/- 0.0095
+RandomForest_Accuracy         0.4038 +/- 0.0192
+RandomForest_F1_Macro         0.3515 +/- 0.0085
+RandomForest_F1_Weighted      0.4087 +/- 0.0152
+RandomForest_Precision_Macro  0.3537 +/- 0.0088
+RandomForest_Recall_Macro     0.3601 +/- 0.0129
+XGBoost_Accuracy              0.4516 +/- 0.0073
+XGBoost_F1_Macro              0.3188 +/- 0.0036
+XGBoost_F1_Weighted           0.4217 +/- 0.0046
+XGBoost_Precision_Macro       0.3468 +/- 0.0441
+XGBoost_Recall_Macro          0.3407 +/- 0.0024
+SVM_Accuracy                  0.3146 +/- 0.0556
+SVM_F1_Macro                  0.3041 +/- 0.0404
+SVM_F1_Weighted               0.3304 +/- 0.0625
+SVM_Precision_Macro           0.3641 +/- 0.0105
+SVM_Recall_Macro              0.3816 +/- 0.0191
+LSTM_Accuracy                 0.2967 +/- 0.0145
+LSTM_F1_Macro                 0.2879 +/- 0.0031
+LSTM_F1_Weighted              0.3184 +/- 0.0241
+LSTM_Precision_Macro          0.3468 +/- 0.0187
+LSTM_Recall_Macro             0.3569 +/- 0.0282
+Transformer_Accuracy          0.3090 +/- 0.0181
+Transformer_F1_Macro          0.2956 +/- 0.0116
+Transformer_F1_Weighted       0.3337 +/- 0.0229
+Transformer_Precision_Macro   0.3350 +/- 0.0118
+Transformer_Recall_Macro      0.3432 +/- 0.0244
+2025-06-30 22:52:12,155 - marketml_project - INFO - Performance summary (mean, std) saved to: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/model_performance_summary.csv
+2025-06-30 22:52:12,155 - marketml_project - INFO - Finished: 02_train_forecasting_models pipeline

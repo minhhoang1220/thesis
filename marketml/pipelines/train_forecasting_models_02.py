@@ -452,7 +452,9 @@ def main():
 
             try:
                 summary_file_path = configs.MODEL_PERF_SUMMARY_FILE
-                summary_stats_valid.to_csv(summary_file_path)
+                summary_to_save = summary_stats_valid.transpose()
+                summary_to_save.to_csv(summary_file_path)
+                # summary_stats_valid.to_csv(summary_file_path)
                 logger.info(f"Performance summary (mean, std) saved to: {summary_file_path.resolve()}")
             except Exception as e:
                 logger.error(f"Error saving performance summary to CSV: {e}", exc_info=True)

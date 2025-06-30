@@ -1,0 +1,43 @@
+2025-07-01 01:46:38,924 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/generate_forecasts.log
+2025-07-01 01:47:21,112 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/generate_forecasts.log
+2025-07-01 01:47:21,112 - marketml_project - INFO - Starting: 03_generate_forecasts pipeline
+2025-07-01 01:47:21,112 - marketml_project - INFO - --- Generating Forecast for Year 2025 using last 3 years of data ---
+2025-07-01 01:47:21,112 - marketml_project - INFO - Attempting to load enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_processed/price_data_enriched_v2.csv
+2025-07-01 01:47:21,230 - marketml_project - INFO - Enriched data loaded successfully. Shape: (18855, 27)
+2025-07-01 01:47:21,230 - marketml_project - INFO - Final training period defined: 2021-12-31 to 2024-12-30
+2025-07-01 01:47:21,236 - marketml_project - INFO - Forecasting for 262 business days from 2024-12-31 to 2025-12-31
+2025-07-01 01:47:21,237 - marketml_project - INFO - Found 15 unique tickers in the training data.
+2025-07-01 01:47:21,237 - marketml_project - INFO -   Processing forecast for ticker: AAPL
+2025-07-01 01:47:21,712 - marketml_project - INFO -     Successfully generated forecast for AAPL.
+2025-07-01 01:47:21,712 - marketml_project - INFO -   Processing forecast for ticker: AMZN
+2025-07-01 01:47:22,328 - marketml_project - INFO -     Successfully generated forecast for AMZN.
+2025-07-01 01:47:22,328 - marketml_project - INFO -   Processing forecast for ticker: F
+2025-07-01 01:47:22,743 - marketml_project - INFO -     Successfully generated forecast for F.
+2025-07-01 01:47:22,744 - marketml_project - INFO -   Processing forecast for ticker: GOOGL
+2025-07-01 01:47:23,401 - marketml_project - INFO -     Successfully generated forecast for GOOGL.
+2025-07-01 01:47:23,401 - marketml_project - INFO -   Processing forecast for ticker: JNJ
+2025-07-01 01:47:23,732 - marketml_project - INFO -     Successfully generated forecast for JNJ.
+2025-07-01 01:47:23,732 - marketml_project - INFO -   Processing forecast for ticker: JPM
+2025-07-01 01:47:24,094 - marketml_project - INFO -     Successfully generated forecast for JPM.
+2025-07-01 01:47:24,095 - marketml_project - INFO -   Processing forecast for ticker: META
+2025-07-01 01:47:24,525 - marketml_project - INFO -     Successfully generated forecast for META.
+2025-07-01 01:47:24,525 - marketml_project - INFO -   Processing forecast for ticker: MSFT
+2025-07-01 01:47:25,427 - marketml_project - INFO -     Successfully generated forecast for MSFT.
+2025-07-01 01:47:25,427 - marketml_project - INFO -   Processing forecast for ticker: NFLX
+2025-07-01 01:47:26,079 - marketml_project - INFO -     Successfully generated forecast for NFLX.
+2025-07-01 01:47:26,079 - marketml_project - INFO -   Processing forecast for ticker: NVDA
+2025-07-01 01:47:27,311 - marketml_project - INFO -     Successfully generated forecast for NVDA.
+2025-07-01 01:47:27,311 - marketml_project - INFO -   Processing forecast for ticker: PG
+2025-07-01 01:47:27,858 - marketml_project - INFO -     Successfully generated forecast for PG.
+2025-07-01 01:47:27,858 - marketml_project - INFO -   Processing forecast for ticker: TSLA
+2025-07-01 01:47:28,489 - marketml_project - INFO -     Successfully generated forecast for TSLA.
+2025-07-01 01:47:28,490 - marketml_project - INFO -   Processing forecast for ticker: UNH
+2025-07-01 01:47:28,904 - marketml_project - INFO -     Successfully generated forecast for UNH.
+2025-07-01 01:47:28,904 - marketml_project - INFO -   Processing forecast for ticker: V
+2025-07-01 01:47:29,377 - marketml_project - INFO -     Successfully generated forecast for V.
+2025-07-01 01:47:29,377 - marketml_project - INFO -   Processing forecast for ticker: XOM
+2025-07-01 01:47:30,499 - marketml_project - INFO -     Successfully generated forecast for XOM.
+2025-07-01 01:47:30,500 - marketml_project - INFO - Forecasts generated successfully for 15 tickers.
+2025-07-01 01:47:30,513 - marketml_project - INFO - Forecasts saved to: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/forecasts_output/arima_forecast_2025.csv
+2025-07-01 01:47:30,554 - marketml_project - INFO - Forecast generation script finished successfully.
+2025-07-01 01:47:30,554 - marketml_project - INFO - Finished: 03_generate_forecasts pipeline

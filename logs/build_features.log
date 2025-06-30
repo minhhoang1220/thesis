@@ -1,0 +1,4 @@
+2025-07-01 01:51:28,611 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/build_features.log
+2025-07-01 01:51:28,612 - marketml_project - INFO - Starting: 01_build_features pipeline
+2025-07-01 01:51:34,612 - marketml_project - INFO - Enriched data saved to: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_processed/price_data_enriched_v2.csv
+2025-07-01 01:51:34,612 - marketml_project - INFO - Finished: 01_build_features pipeline

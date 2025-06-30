@@ -203,6 +203,25 @@ def main():
     except Exception as e:
         logger.error(f"Error training soft signal model: {e}. Aborting.", exc_info=True)
         return
+    
+    model_name_for_importance = configs.SOFT_SIGNAL_MODEL_NAME
+    if hasattr(signal_model, 'feature_importances_'):
+        logger.info(f"Extracting feature importance from {model_name_for_importance} model...")
+        # Đảm bảo feature_cols_with_lags được định nghĩa đúng ở đầu hàm main
+        importance_df = pd.DataFrame({
+            'feature': feature_cols_with_lags,
+            'importance': signal_model.feature_importances_
+        }).sort_values('importance', ascending=False)
+        
+        try:
+            importance_path = configs.RESULTS_OUTPUT_DIR / f"{model_name_for_importance.lower()}_feature_importance.csv"
+            importance_path.parent.mkdir(parents=True, exist_ok=True)
+            importance_df.to_csv(importance_path, index=False)
+            logger.info(f"Successfully saved feature importance to: {importance_path}")
+        except Exception as e_fi:
+            logger.error(f"Error saving feature importance: {e_fi}", exc_info=True)
+    else:
+        logger.warning(f"Model {model_name_for_importance} does not have 'feature_importances_' attribute. Skipping save.")
 
     # --- 5. Prepare Prediction Data ---
     logger.info("Preparing prediction data for the soft signal model...")

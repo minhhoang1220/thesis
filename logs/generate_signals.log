@@ -23,3 +23,51 @@
 759 2023-01-06   AAPL               0.372445              0.048374               0.579181
 760 2023-01-09   AAPL               0.416833              0.113690               0.469476
 2025-05-19 22:21:43,880 - marketml_project - INFO - generate_signals.py script finished.
+2025-07-01 02:45:08,647 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/generate_signals.log
+2025-07-01 02:45:14,800 - marketml_project - INFO - Random seeds set to: 42
+2025-07-01 02:45:14,800 - marketml_project - INFO - Starting: 04_generate_signals pipeline
+2025-07-01 02:45:14,904 - marketml_project - INFO - Loaded enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_processed/price_data_enriched_v2.csv. Shape: (18855, 27)
+2025-07-01 02:45:14,906 - marketml_project - INFO - Using features for signal model: ['BB_Lower', 'BB_Upper', 'EMA_20', 'MACD', 'MACD_Hist', 'MACD_Signal', 'OBV', 'RSI', 'RSI_roll_mean_10', 'RSI_roll_mean_5', 'RSI_roll_std_10', 'RSI_roll_std_5', 'close_roll_mean_10', 'close_roll_mean_5', 'close_roll_std_10', 'close_roll_std_5', 'close_zscore_20', 'garch_vol_forecast', 'pct_change_lag_1', 'pct_change_lag_3', 'pct_change_lag_5', 'volume']
+2025-07-01 02:45:14,907 - marketml_project - INFO - Preparing training data for the soft signal model...
+2025-07-01 02:45:14,907 - marketml_project - INFO - Preparing data for signal generation from 2020-01-01 to 2022-12-31...
+2025-07-01 02:45:14,952 - marketml_project - WARNING - Feature 'garch_vol_forecast' is all NaN in the current data slice. Filling with 0 before imputation.
+2025-07-01 02:45:14,967 - marketml_project - INFO - Training soft signal model: XGBoost...
+2025-07-01 02:45:16,924 - marketml_project - INFO - XGBoost trained successfully.
+2025-07-01 02:45:16,924 - marketml_project - INFO - Preparing prediction data for the soft signal model...
+2025-07-01 02:45:16,924 - marketml_project - INFO - Preparing data for signal generation from 2023-01-01 to 2023-12-31...
+2025-07-01 02:45:16,960 - marketml_project - WARNING - Feature 'garch_vol_forecast' is all NaN in the current data slice. Filling with 0 before imputation.
+2025-07-01 02:45:16,964 - marketml_project - INFO - Predicting probabilities for period 2023-01-01 to 2023-12-31...
+2025-07-01 02:45:16,992 - marketml_project - INFO - Successfully generated and saved soft signals to: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/classification_probabilities.csv
+2025-07-01 02:45:16,995 - marketml_project - INFO - Output DataFrame head:
+          date ticker  prob_decrease_XGBoost  prob_neutral_XGBoost  prob_increase_XGBoost
+756 2023-01-03   AAPL               0.345948              0.097313               0.556739
+757 2023-01-04   AAPL               0.413917              0.040546               0.545537
+758 2023-01-05   AAPL               0.307537              0.060836               0.631627
+759 2023-01-06   AAPL               0.372445              0.048374               0.579181
+760 2023-01-09   AAPL               0.416833              0.113690               0.469476
+2025-07-01 02:45:16,996 - marketml_project - INFO - Finished: 04_generate_signals pipeline
+2025-07-01 02:49:18,995 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/generate_signals.log
+2025-07-01 02:49:24,349 - marketml_project - INFO - Random seeds set to: 42
+2025-07-01 02:49:24,349 - marketml_project - INFO - Starting: 04_generate_signals pipeline
+2025-07-01 02:49:24,458 - marketml_project - INFO - Loaded enriched data from: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_processed/price_data_enriched_v2.csv. Shape: (18855, 27)
+2025-07-01 02:49:24,463 - marketml_project - INFO - Using features for signal model: ['BB_Lower', 'BB_Upper', 'EMA_20', 'MACD', 'MACD_Hist', 'MACD_Signal', 'OBV', 'RSI', 'RSI_roll_mean_10', 'RSI_roll_mean_5', 'RSI_roll_std_10', 'RSI_roll_std_5', 'close_roll_mean_10', 'close_roll_mean_5', 'close_roll_std_10', 'close_roll_std_5', 'close_zscore_20', 'garch_vol_forecast', 'pct_change_lag_1', 'pct_change_lag_3', 'pct_change_lag_5', 'volume']
+2025-07-01 02:49:24,463 - marketml_project - INFO - Preparing training data for the soft signal model...
+2025-07-01 02:49:24,463 - marketml_project - INFO - Preparing data for signal generation from 2020-01-01 to 2022-12-31...
+2025-07-01 02:49:24,513 - marketml_project - WARNING - Feature 'garch_vol_forecast' is all NaN in the current data slice. Filling with 0 before imputation.
+2025-07-01 02:49:24,527 - marketml_project - INFO - Training soft signal model: XGBoost...
+2025-07-01 02:49:25,816 - marketml_project - INFO - XGBoost trained successfully.
+2025-07-01 02:49:25,818 - marketml_project - INFO - Extracting feature importance from XGBoost model...
+2025-07-01 02:49:25,825 - marketml_project - INFO - Successfully saved feature importance to: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/xgboost_feature_importance.csv
+2025-07-01 02:49:25,826 - marketml_project - INFO - Preparing prediction data for the soft signal model...
+2025-07-01 02:49:25,826 - marketml_project - INFO - Preparing data for signal generation from 2023-01-01 to 2023-12-31...
+2025-07-01 02:49:25,847 - marketml_project - WARNING - Feature 'garch_vol_forecast' is all NaN in the current data slice. Filling with 0 before imputation.
+2025-07-01 02:49:25,852 - marketml_project - INFO - Predicting probabilities for period 2023-01-01 to 2023-12-31...
+2025-07-01 02:49:25,896 - marketml_project - INFO - Successfully generated and saved soft signals to: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/results_output/classification_probabilities.csv
+2025-07-01 02:49:25,901 - marketml_project - INFO - Output DataFrame head:
+          date ticker  prob_decrease_XGBoost  prob_neutral_XGBoost  prob_increase_XGBoost
+756 2023-01-03   AAPL               0.345948              0.097313               0.556739
+757 2023-01-04   AAPL               0.413917              0.040546               0.545537
+758 2023-01-05   AAPL               0.307537              0.060836               0.631627
+759 2023-01-06   AAPL               0.372445              0.048374               0.579181
+760 2023-01-09   AAPL               0.416833              0.113690               0.469476
+2025-07-01 02:49:25,901 - marketml_project - INFO - Finished: 04_generate_signals pipeline

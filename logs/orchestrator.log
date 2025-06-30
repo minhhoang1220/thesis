@@ -473,3 +473,11 @@ Transformer_Recall_Macro      0.3432 ± 0.0244
 2025-05-29 07:12:53,974 - marketml_project - INFO - ===== Analysis Completed =====
 2025-05-29 07:12:53,976 - marketml_project - INFO - Successfully completed stage: analyze_performance
 2025-05-29 07:12:53,976 - marketml_project - INFO - Pipeline finished.
+2025-06-30 21:04:31,258 - marketml_project - INFO - Logging setup complete. Log level: INFO. Log file: /home/hoang/Documents/KhoaLuan/.ndmh/logs/orchestrator.log
+2025-06-30 21:04:31,263 - marketml_project - INFO - Pipeline starting with stages: build_features, train_forecasting, generate_forecasts, generate_signals, run_backtests, analyze_performance
+2025-06-30 21:04:31,264 - marketml_project - INFO - Attempting to run stage: build_features
+2025-06-30 21:04:32,071 - marketml_project - INFO - Starting: 01_build_features pipeline
+2025-06-30 21:04:38,779 - marketml_project - INFO - Enriched data saved to: /home/hoang/Documents/KhoaLuan/.ndmh/marketml/data_processed/price_data_enriched_v2.csv
+2025-06-30 21:04:38,779 - marketml_project - INFO - Finished: 01_build_features pipeline
+2025-06-30 21:04:38,782 - marketml_project - INFO - Successfully completed stage: build_features
+2025-06-30 21:04:38,782 - marketml_project - INFO - Attempting to run stage: train_forecasting
