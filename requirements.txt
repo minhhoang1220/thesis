@@ -1,21 +1,23 @@
 # /.ndmh/requirements.txt
 -e .
 
-pandas>=1.3,<2.0
-numpy>=1.20,<2.0
+pandas
+numpy
 scipy
-scikit-learn>=1.0,<1.4
-xgboost>=1.5
-tensorflow>=2.8
-gymnasium>=0.26
+scikit-learn
+xgboost
+tensorflow
+gymnasium
+stable-baselines3[extra]
 pmdarima
-statsmodels>=0.13
-arch>=5.0
-PyPortfolioOpt>=1.5
-yfinance>=0.2.12
-matplotlib>=3.4
-seaborn>=0.11
-plotly>=6.0
+statsmodels
+arch
+PyPortfolioOpt
+yfinance
+matplotlib
+seaborn
+plotly
 joblib
 openpyxl
 streamlit
+quantstats
