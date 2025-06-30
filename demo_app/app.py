@@ -45,5 +45,5 @@ with col2:
     st.markdown("""
     - Mean-Variance (Markowitz)
     - Black-Litterman
-    - Reinforcement Learning (PPO/A2C)
+    - Reinforcement Learning (PPO)
     """)
