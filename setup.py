@@ -31,7 +31,7 @@ setup(
     # Packages and exclusions
     packages=find_packages(exclude=["tests*", "notebooks*"]),
     include_package_data=True,
-    install_requires=install_requires,
+    install_requires=[],
     python_requires='>=3.10',
     classifiers=[
         'Development Status :: 3 - Alpha',
