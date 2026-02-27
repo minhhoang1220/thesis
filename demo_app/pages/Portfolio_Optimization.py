@@ -119,7 +119,7 @@ with tab3:
         plot_path = get_plot_path(filename)
         if plot_path:
             with st.expander(f"View: {title}", expanded=False):
-                st.image(str(plot_path), use_container_width=True)
+                st.image(str(plot_path), use_column_width=True)
         else:
             with st.expander(f"View: {title} (not available)", expanded=False):
                 st.warning(f"File '{filename}' does not exist. Please run the pipeline to generate it.")
