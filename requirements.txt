@@ -1,6 +1,7 @@
 # /.ndmh/requirements.txt
 -e .
 
+altair<5.0.0
 pandas
 numpy
 scipy
