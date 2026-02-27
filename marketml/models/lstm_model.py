@@ -84,6 +84,7 @@ def run_lstm_evaluation(X_train_seq, y_train_seq, X_test_seq, y_test_original_tr
         logger.info("    Predicting with LSTM...")
         if X_test_seq.shape[0] > 0:
             lstm_pred_probs = lstm_model.predict(X_test_seq)
+            results["LSTM_Probs"] = lstm_pred_probs
             lstm_pred_keras = np.argmax(lstm_pred_probs, axis=1)
             lstm_pred_trend = lstm_pred_keras - 1
 
