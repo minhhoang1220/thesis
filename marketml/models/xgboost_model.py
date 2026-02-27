@@ -69,9 +69,11 @@ def run_xgboost_evaluation(X_train_scaled, y_train, X_test_scaled, y_test,
         logger.info("  Predicting with best XGBoost...")
         xgb_preds_mapped = best_xgb_model.predict(X_test_scaled)
         xgb_preds_trend = xgb_preds_mapped - 1 # Convert back to -1, 0, 1
+        xgb_probs = best_xgb_model.predict_proba(X_test_scaled)
 
         xgb_metrics_results = metrics.calculate_classification_metrics(y_test, xgb_preds_trend, model_name="XGBoost", logger=logger)
         results.update(xgb_metrics_results)
+        results["XGBoost_Probs"] = xgb_probs
         results["XGBoost_BestParams"] = str(xgb_search.best_params_)
 
     except Exception as e:
