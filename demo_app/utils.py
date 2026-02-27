@@ -60,16 +60,15 @@ def load_confusion_matrix(model_name):
 
     try:
         df_price = df_price.sort_values(['ticker', 'date'])
-        df_price['pct_change'] = df_price.groupby('ticker')['close'].pct_change()
+        df_price['pct_change_next_day'] = df_price.groupby('ticker')['close'].pct_change().shift(-1)
         
-        # Sử dụng đúng TREND_THRESHOLD = 0.002 từ config của bạn
         def get_actual_label(x):
             if pd.isna(x): return np.nan
             if x > TREND_THRESHOLD: return 1
             if x < -TREND_THRESHOLD: return -1
             return 0
         
-        df_price['actual_label'] = df_price['pct_change'].apply(get_actual_label)
+        df_price['actual_label'] = df_price['pct_change_next_day'].apply(get_actual_label)
 
         cols = [c for c in df_probs.columns if f'_{model_name}' in c]
         if not cols: return None
