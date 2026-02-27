@@ -60,9 +60,11 @@ def run_rf_evaluation(X_train_scaled, y_train, X_test_scaled, y_test,
 
         logger.info("  Predicting with best RandomForest...")
         rf_preds = best_rf_model.predict(X_test_scaled)
+        rf_probs = best_rf_model.predict_proba(X_test_scaled)
 
         rf_metrics_results = metrics.calculate_classification_metrics(y_test, rf_preds, model_name="RandomForest", logger=logger)
         results.update(rf_metrics_results)
+        results["RandomForest_Probs"] = rf_probs
         results["RandomForest_BestParams"] = str(rf_search.best_params_)
 
     except Exception as e:
