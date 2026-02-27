@@ -57,9 +57,11 @@ def run_svm_evaluation(X_train_scaled, y_train, X_test_scaled, y_test,
 
         logger.info("  Predicting with best SVM...")
         svm_preds = best_svm_model.predict(X_test_scaled)
+        svm_probs = best_svm_model.predict_proba(X_test_scaled)
 
         svm_metrics_results = metrics.calculate_classification_metrics(y_test, svm_preds, model_name="SVM", logger=logger)
         results.update(svm_metrics_results)
+        results["SVM_Probs"] = svm_probs
         results["SVM_BestParams"] = str(svm_search.best_params_)
 
     except Exception as e:
