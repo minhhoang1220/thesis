@@ -114,7 +114,7 @@ with tab1:
         xaxis_title="Date", yaxis_title="Price (USD)", xaxis_rangeslider_visible=False, height=600,
         legend_title="Legend"
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 with tab2:
     st.header(f"Model Performance: {selected_model_for_metrics}")
@@ -151,7 +151,7 @@ with tab2:
             fig_cm.update_layout(
                 title_text='<i>Predicted vs. Actual</i>', xaxis_title='Predicted Label', yaxis_title='Actual Label'
             )
-            st.plotly_chart(fig_cm, use_container_width=True)
+            st.plotly_chart(fig_cm, width='stretch')
         else:
             st.info(f"No confusion matrix data for model {selected_model_for_metrics}. "
                     f"Please run the pipeline to generate `marketml/results_output/{selected_model_for_metrics.lower()}_confusion_matrix.json`.")
