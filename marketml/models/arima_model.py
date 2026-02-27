@@ -78,6 +78,17 @@ def run_arima_evaluation(train_df: pd.DataFrame, test_df: pd.DataFrame,
             arima_predictions_all.extend(arima_preds_pct)
             arima_actual_trends_all.extend(y_test_trend_ticker_aligned.values)
 
+            if arima_predictions_all:
+                preds_np = np.array(arima_predictions_all)
+                arima_probs = np.zeros((len(preds_np), 3))
+                # Cột 0: Decrease, Cột 1: Neutral, Cột 2: Increase
+                arima_probs[:, 0] = (preds_np < -trend_threshold).astype(float)
+                arima_probs[:, 2] = (preds_np > trend_threshold).astype(float)
+                arima_probs[:, 1] = 1.0 - (arima_probs[:, 0] + arima_probs[:, 2])
+                results_this_split["ARIMA_Probs"] = arima_probs
+        
+            return results_this_split
+
         except Exception as e:
             logger.error(f"    Error processing ARIMA for {ticker}: {e}", exc_info=True)
 
