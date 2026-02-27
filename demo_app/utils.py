@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import json
+from sklearn.metrics import confusion_matrix
 
 # --- Path definitions ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -49,12 +50,32 @@ def load_model_performance():
 
 @st.cache_data
 def load_confusion_matrix(model_name):
-    """Load confusion matrix data for a specific model."""
-    path = RESULTS_OUTPUT_DIR / f"{model_name.lower()}_confusion_matrix.json"
-    if path.exists():
-        with open(path, 'r') as f:
-            return json.load(f)
-    return None
+    df_probs = load_forecast_signals() # Đã có sẵn trong utils.py của bạn
+    df_price = load_price_data()      # Đã có sẵn trong utils.py của bạn
+    
+    if df_probs.empty or df_price.empty:
+        return None
+
+    try:
+        cols = [c for c in df_probs.columns if f'_{model_name}' in c]
+        if not cols: return None
+        df_probs['predicted'] = df_probs[cols].idxmax(axis=1).apply(
+            lambda x: 1 if 'increase' in x else (-1 if 'decrease' in x else 0)
+        )
+
+        merged = pd.merge(df_probs[['date', 'ticker', 'predicted']], 
+                          df_price[['date', 'ticker', 'target']], 
+                          on=['date', 'ticker'])
+        
+        labels = [-1, 0, 1]
+        cm = confusion_matrix(merged['target'], merged['predicted'], labels=labels)
+        
+        return {
+            'matrix': cm.tolist(),
+            'labels': ['Decrease', 'Neutral', 'Increase']
+        }
+    except Exception:
+        return None
 
 @st.cache_data
 def load_feature_importance(model_name):
