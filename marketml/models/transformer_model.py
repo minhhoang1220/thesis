@@ -102,6 +102,7 @@ def run_transformer_evaluation(X_train_seq, y_train_seq, X_test_seq, y_test_orig
         logger.info("    Predicting with Transformer...")
         if X_test_seq.shape[0] > 0:
             transformer_pred_probs = transformer_model.predict(X_test_seq)
+            results["Transformer_Probs"] = transformer_pred_probs
             transformer_pred_keras = np.argmax(transformer_pred_probs, axis=1)
             transformer_pred_trend = transformer_pred_keras - 1
 
