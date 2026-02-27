@@ -23,3 +23,4 @@ openpyxl
 streamlit>=1.12.0
 quantstats
 protobuf<=3.20.3
+text pyarrow<15.0.0
