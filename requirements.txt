@@ -20,7 +20,7 @@ seaborn
 plotly
 joblib
 openpyxl
-streamlit>=1.12.0
+streamlit>=1.30.0
 quantstats
 protobuf<=3.20.3
 pyarrow<15.0.0
